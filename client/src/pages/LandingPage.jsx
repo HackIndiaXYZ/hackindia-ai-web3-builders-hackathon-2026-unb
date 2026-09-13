@@ -119,20 +119,15 @@ export default function LandingPage({ onEnterDemo, onEnterPortal }) {
   const currentTx = TX_SAMPLES[txIndex];
 
   return (
-    <div className="min-h-screen bg-[#060913] text-slate-100 font-sans overflow-x-hidden">
-      {/* Grid texture */}
-      <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
-      {/* Glow orbs */}
-      <div className="fixed top-0 left-0 w-[700px] h-[700px] bg-emerald-500 opacity-[0.05] rounded-full blur-[130px] pointer-events-none" />
-      <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-teal-400 opacity-[0.04] rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed top-1/2 right-10 w-[300px] h-[300px] bg-amber-500 opacity-[0.03] rounded-full blur-[100px] pointer-events-none" />
+    <div className="public-service-home min-h-screen bg-[#060913] text-slate-100 font-sans overflow-x-hidden">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-slate-900">Skip to main content</a>
 
       {/* ── LIVE ACTIVITY TICKER BAR ── */}
       <div className="sticky top-0 z-50">
         <div className="bg-slate-950/90 border-b border-slate-800/60 px-6 py-1.5 flex items-center gap-4 backdrop-blur-xl overflow-hidden">
           <div className="flex items-center gap-2 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest">LIVE CHAIN</span>
+            <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest">PUBLIC SERVICE STATUS</span>
           </div>
           <div className="flex-1 overflow-hidden">
             <div key={txIndex} className="flex items-center gap-4 text-[10px] font-mono animate-in slide-in-from-right duration-500">
@@ -147,12 +142,12 @@ export default function LandingPage({ onEnterDemo, onEnterPortal }) {
           <div className="shrink-0 flex items-center gap-2 text-[10px] font-mono text-slate-400">
             <Hash className="w-3 h-3 text-slate-600" />
             <span className="text-white font-bold">{liveCount.toLocaleString()}</span>
-            <span>{t('events on-chain', 'ऑन-चेन इवेंट्स')}</span>
+            <span>{t('verified records', 'सत्यापित रिकॉर्ड')}</span>
           </div>
         </div>
 
         {/* NAVBAR */}
-        <nav className={`transition-all duration-300 ${scrolled ? 'bg-[#060913]/97 backdrop-blur-xl shadow-2xl border-b border-slate-800/60' : 'bg-transparent'}`}>
+        <nav className={`transition-all duration-300 ${scrolled ? 'bg-[#060913]/97 backdrop-blur-xl shadow-2xl border-b border-slate-800/60' : 'bg-transparent'}`} aria-label="Primary navigation">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
@@ -173,7 +168,7 @@ export default function LandingPage({ onEnterDemo, onEnterPortal }) {
                 <Globe className="w-3.5 h-3.5" />
                 <span>{isHindi ? 'EN' : 'हिंदी'}</span>
               </button>
-              <button onClick={onEnterDemo} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
+              <button onClick={onEnterDemo} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-lg flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
                 <span>{t('Enter Demo', 'डेमो देखें')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -186,37 +181,34 @@ export default function LandingPage({ onEnterDemo, onEnterPortal }) {
       </div>
 
       {/* ── SECTION 1: HERO ── */}
-      <section className="relative min-h-[92vh] flex flex-col items-center justify-center px-6 pt-6 pb-20 text-center">
-        <div className="max-w-5xl mx-auto space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold tracking-wider">
+      <main id="main-content">
+      <section className="relative min-h-[74vh] flex flex-col items-center justify-center px-6 pt-12 pb-20 text-center">
+        <div className="max-w-5xl mx-auto space-y-7">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold tracking-wider">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>HackIndia 2026 · FSSAI · NDLM · Blockchain-Secured DPI</span>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-extrabold text-white leading-tight tracking-tight">
-            {t("India's Open Dairy", "भारत का खुला डेयरी")}
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400">
-              {t("Intelligence Protocol", "इंटेलिजेंस प्रोटोकॉल")}
-            </span>
+          <h1 className="text-4xl md:text-6xl font-extrabold text-white leading-tight tracking-tight">
+            {t("India's Dairy Traceability Portal", "भारत का डेयरी ट्रेसेबिलिटी पोर्टल")}
           </h1>
 
-          <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg md:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
             {t(
-              "From cow to consumer — every litre of milk, tamper-evident, hardware-anchored, and blockchain-sealed.",
-              "गाय से उपभोक्ता तक — दूध का हर लीटर, हार्डवेयर-एंकर्ड, ब्लॉकचेन-सीलबंद।"
+              "A single place for farmers, collection centres, quality officers, auditors and consumers to verify the journey of milk.",
+              "किसानों, संग्रह केंद्रों, गुणवत्ता अधिकारियों, लेखापरीक्षकों और उपभोक्ताओं के लिए दूध की यात्रा सत्यापित करने का एक पोर्टल।"
             )}
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <button onClick={onEnterDemo} className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-base rounded-2xl flex items-center gap-2 shadow-xl shadow-emerald-500/30 transition-all transform hover:scale-[1.02] hover:shadow-emerald-500/50">
+            <button onClick={onEnterDemo} className="px-7 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-base rounded-lg flex items-center gap-2 shadow-xl shadow-emerald-500/30 transition-all">
               <Zap className="w-5 h-5" />
               <span>{t('Enter Live Demo', 'लाइव डेमो चालू करें')}</span>
             </button>
-            <a href="#crisis" className="px-8 py-4 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10 font-bold text-base rounded-2xl flex items-center gap-2 transition-all">
-              <BarChart3 className="w-4 h-4 text-emerald-400" />
-              <span>{t('See The Crisis', 'संकट देखें')}</span>
-              <ChevronDown className="w-4 h-4" />
+            <a href="#services" className="px-7 py-3.5 border border-slate-600 text-slate-200 hover:bg-slate-800 font-bold text-base rounded-lg flex items-center gap-2 transition-all">
+              <FileText className="w-4 h-4 text-emerald-400" />
+              <span>{t('View online services', 'ऑनलाइन सेवाएं देखें')}</span>
+              <ArrowRight className="w-4 h-4" />
             </a>
           </div>
 
@@ -234,10 +226,38 @@ export default function LandingPage({ onEnterDemo, onEnterPortal }) {
             ))}
           </div>
         </div>
-        <a href="#crisis" className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-600 hover:text-emerald-400 transition-colors animate-bounce">
+        <a href="#services" className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-600 hover:text-emerald-400 transition-colors" aria-label="View online services">
           <ChevronDown className="w-7 h-7" />
         </a>
       </section>
+
+      <section id="services" className="public-service-section border-y border-slate-800/60 bg-[#0a0f1e]/80 px-6 py-12">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">{t('Online services', 'ऑनलाइन सेवाएं')}</div>
+              <h2 className="mt-1 text-2xl font-bold text-white">{t('What would you like to do?', 'आप क्या करना चाहते हैं?')}</h2>
+            </div>
+            <span className="text-xs text-slate-400">{t('Choose a service to continue', 'जारी रखने के लिए सेवा चुनें')}</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: Leaf, title: t('Farmer services', 'किसान सेवाएं'), detail: t('Log milk collection and view payments', 'दूध संग्रह और भुगतान देखें'), role: 'FARMER' },
+              { icon: Snowflake, title: t('Collection centre', 'संग्रह केंद्र'), detail: t('Record a pour and sync AMCU data', 'पोर रिकॉर्ड और AMCU डेटा सिंक करें'), role: 'AGGREGATOR' },
+              { icon: Scale, title: t('Quality checks', 'गुणवत्ता जांच'), detail: t('Review batches and test results', 'बैच और जांच परिणाम देखें'), role: 'QC_OFFICER' },
+              { icon: Milk, title: t('Verify a product', 'उत्पाद सत्यापित करें'), detail: t('Check a pouch and its source', 'पाउच और उसका स्रोत जांचें'), role: 'CONSUMER' },
+            ].map((service) => {
+              const ServiceIcon = service.icon;
+              return <button key={service.role} onClick={() => onEnterPortal(service.role)} className="group flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-left transition-colors hover:border-emerald-500/60 hover:bg-slate-800">
+                <ServiceIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                <span><span className="block text-sm font-bold text-white">{service.title}</span><span className="mt-1 block text-xs leading-relaxed text-slate-400">{service.detail}</span></span>
+                <ArrowRight className="ml-auto mt-1 h-4 w-4 shrink-0 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-emerald-400" />
+              </button>;
+            })}
+          </div>
+        </div>
+      </section>
+      </main>
 
       {/* ── SECTION 2: ANIMATED COUNTER STATS ── */}
       <section ref={statsRef} className="py-16 px-6 border-y border-slate-800/60 bg-[#0a0f1e]/80">

@@ -59,7 +59,7 @@ function DemoAppShell({ onBackToHome }) {
 }
 
 function AppInner() {
-  const { setCurrentRole } = useAnveshana();
+  const { setCurrentRole, theme, fontScale } = useAnveshana();
   const [showLanding, setShowLanding] = useState(true);
 
   const handleEnterDemo = () => {
@@ -76,16 +76,18 @@ function AppInner() {
     setShowLanding(true);
   };
 
-  if (showLanding) {
-    return (
-      <LandingPage
-        onEnterDemo={handleEnterDemo}
-        onEnterPortal={handleEnterPortal}
-      />
-    );
-  }
-
-  return <DemoAppShell onBackToHome={handleBackToHome} />;
+  return (
+    <div className={`app-theme theme-${theme} font-scale-${fontScale}`}>
+      {showLanding ? (
+        <LandingPage
+          onEnterDemo={handleEnterDemo}
+          onEnterPortal={handleEnterPortal}
+        />
+      ) : (
+        <DemoAppShell onBackToHome={handleBackToHome} />
+      )}
+    </div>
+  );
 }
 
 export default function App() {

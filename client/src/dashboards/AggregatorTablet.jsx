@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAnveshana } from '../context/AnveshanaContext';
+import { calculateDynamicYieldBound, useAnveshana } from '../context/AnveshanaContext';
 import { Lock, Tablet, Wifi, WifiOff, AlertTriangle, CheckCircle2, QrCode, RefreshCw, Send, ShieldAlert, Cpu, HardDrive, Key, FileCheck, ArrowRight, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -10,13 +10,21 @@ export default function AggregatorTablet() {
     isOnline,
     pourEvents,
     setActiveEvidenceModal,
-    language
+    language,
+    createCollectionRequest,
+    markPourPaid,
+    ndlmVerificationCases,
+    collectionRequests,
+    submitAggregatorMeasurements,
+    transferToChillingCenter
   } = useAnveshana();
 
   const isHindi = language === 'HI';
 
   const [selectedFarmerId, setSelectedFarmerId] = useState(farmers[0].farmerId);
   const selectedFarmer = farmers.find(f => f.farmerId === selectedFarmerId) || farmers[0];
+  const dynamicYieldModel = calculateDynamicYieldBound({ farmer: selectedFarmer, pourEvents });
+  const ineligibleAnimals = ndlmVerificationCases.filter(item => item.farmerId === selectedFarmer.farmerId && (item.pregnancyStatus === 'PREGNANT' || item.postCalvingRecovery));
 
   // Hardware Serial Telemetry Lock State (Essae-SN8831)
   const [amcuStream, setAmcuStream] = useState({
@@ -31,6 +39,14 @@ export default function AggregatorTablet() {
   const [yieldViolationError, setYieldViolationError] = useState(null);
   const [offlineQueue, setOfflineQueue] = useState([]);
   const [showManifestQR, setShowManifestQR] = useState(false);
+  const [requestFarmerId, setRequestFarmerId] = useState('');
+  const [requestSession, setRequestSession] = useState(new Date().getHours() < 14 ? 'MORNING' : 'EVENING');
+  const [requestAmountKg, setRequestAmountKg] = useState('8');
+  const [requestNotice, setRequestNotice] = useState(null);
+  const [measurementRequestId, setMeasurementRequestId] = useState(null);
+  const [measurements, setMeasurements] = useState({ weightKg: '', fatPercent: '', snfPercent: '', temperatureC: '', adulterationCheck: 'PASS', notes: '' });
+  const [transferRequestId, setTransferRequestId] = useState(null);
+  const [transferDetails, setTransferDetails] = useState({ destinationNodeId: 'MCC-KNL-01', amountKg: '', fatPercent: '', snfPercent: '', temperatureC: '', vehicleId: '', sealId: '', notes: '' });
 
   // Hardware Signing Interactive Simulation Modal State
   const [signingModal, setSigningModal] = useState({
@@ -59,8 +75,17 @@ export default function AggregatorTablet() {
   const handleStartHardwareSigning = () => {
     setYieldViolationError(null);
 
-    // AI Dynamic Yield Limit Check: Max expected yield = registeredCows * 12.0 kg per session
-    const maxExpectedKg = selectedFarmer.registeredCows * 12.0;
+    if (ineligibleAnimals.length === selectedFarmer.registeredCows && selectedFarmer.registeredCows > 0) {
+      setYieldViolationError({
+        farmerName: selectedFarmer.name,
+        actualKg: amcuStream.weightKg,
+        maxExpectedKg: 0,
+        reason: isHindi ? 'सभी पंजीकृत पशु गर्भवती या प्रसवोत्तर रिकवरी में हैं। दूध संग्रह अस्थायी रूप से रोका गया है।' : 'Collection paused: all registered animals are pregnant or in post-calving recovery.'
+      });
+      return;
+    }
+
+    const maxExpectedKg = dynamicYieldModel.herdBound;
 
     if (amcuStream.weightKg > maxExpectedKg) {
       setYieldViolationError({
@@ -68,9 +93,10 @@ export default function AggregatorTablet() {
         cows: selectedFarmer.registeredCows,
         maxExpectedKg,
         actualKg: amcuStream.weightKg,
+        model: dynamicYieldModel,
         reason: isHindi
-          ? `दूध का वजन ${amcuStream.weightKg}किग्रा ${selectedFarmer.registeredCows} पंजीकृत मवेशियों के लिए अधिकतम जैविक उपज सीमा (${maxExpectedKg}किग्रा) से अधिक है।`
-          : `Pour weight ${amcuStream.weightKg}kg exceeds max biological yield limit (${maxExpectedKg}kg) for ${selectedFarmer.registeredCows} registered cows.`
+          ? `दूध का वजन ${amcuStream.weightKg}किग्रा गतिशील जैविक सीमा (${maxExpectedKg}किग्रा) से अधिक है। औसत ${dynamicYieldModel.rollingMean}किग्रा/पशु, चरण ${dynamicYieldModel.lactationDay} दिन।`
+          : `Pour weight ${amcuStream.weightKg}kg exceeds the dynamic biological bound (${maxExpectedKg}kg). Rolling mean is ${dynamicYieldModel.rollingMean}kg/cow at lactation day ${dynamicYieldModel.lactationDay}.`
       });
       return;
     }
@@ -86,7 +112,8 @@ export default function AggregatorTablet() {
       weightKg: amcuStream.weightKg,
       fatPercent: amcuStream.fatPercent,
       snfPercent: amcuStream.snfPercent,
-      yieldStatus: 'PASS'
+      yieldStatus: 'PASS',
+      dynamicYieldModel
     };
 
     // Launch Hardware Signing Modal
@@ -115,7 +142,8 @@ export default function AggregatorTablet() {
       if (!isOnline) {
         setOfflineQueue(prev => [pourPayload, ...prev]);
       } else {
-        addPourEvent(pourPayload);
+        const recordedPour = addPourEvent(pourPayload);
+        setSigningModal(prev => ({ ...prev, payload: { ...prev.payload, eventId: recordedPour.eventId, paymentStatus: recordedPour.paymentStatus } }));
         confetti({ particleCount: 60, spread: 70 });
       }
     }, 2700);
@@ -126,6 +154,29 @@ export default function AggregatorTablet() {
     offlineQueue.forEach(item => addPourEvent(item));
     setOfflineQueue([]);
     confetti({ particleCount: 70 });
+  };
+
+  const handleCreateCollectionRequest = () => {
+    const farmer = farmers.find(item => item.farmerId === requestFarmerId);
+    if (!farmer) return;
+    const request = createCollectionRequest({ farmerId: farmer.farmerId, nodeId: farmer.nodeId, requestedSession: requestSession, requestedAmountKg: requestAmountKg });
+    setRequestNotice(`${request.farmerName} requested for ${request.requestedSession.toLowerCase()} collection at ${request.nodeId}`);
+  };
+
+  const activeMeasurementRequest = collectionRequests.find(request => request.requestId === measurementRequestId);
+  const saveMeasurements = () => {
+    if (!activeMeasurementRequest || !measurements.weightKg || !measurements.fatPercent || !measurements.snfPercent) return;
+    submitAggregatorMeasurements(activeMeasurementRequest.requestId, measurements);
+    setMeasurementRequestId(null);
+    setMeasurements({ weightKg: '', fatPercent: '', snfPercent: '', temperatureC: '', adulterationCheck: 'PASS', notes: '' });
+  };
+
+  const activeTransferRequest = collectionRequests.find(request => request.requestId === transferRequestId);
+  const saveTransfer = () => {
+    if (!activeTransferRequest || !transferDetails.amountKg || !transferDetails.fatPercent || !transferDetails.snfPercent || !transferDetails.vehicleId || !transferDetails.sealId) return;
+    transferToChillingCenter(activeTransferRequest.requestId, transferDetails);
+    setTransferRequestId(null);
+    setTransferDetails({ destinationNodeId: 'MCC-KNL-01', amountKg: '', fatPercent: '', snfPercent: '', temperatureC: '', vehicleId: '', sealId: '', notes: '' });
   };
 
   return (
@@ -219,8 +270,12 @@ export default function AggregatorTablet() {
                 <span className="text-white font-semibold">{selectedFarmer.animalBreed} ({selectedFarmer.registeredCows} {isHindi ? 'मवेशी' : 'Cattle'})</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400">{isHindi ? 'अधिकतम जैविक जमाव सीमा:' : 'Max Biological Limit:'}</span>
-                <span className="text-amber-400 font-mono font-bold">{selectedFarmer.registeredCows * 12.0} kg</span>
+                <span className="text-slate-400">{isHindi ? 'गतिशील जैविक सीमा:' : 'Dynamic Biological Bound:'}</span>
+                <span className="text-amber-400 font-mono font-bold">{dynamicYieldModel.herdBound} kg</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-slate-400">{isHindi ? '7-दिन औसत / चरण:' : '7-day mean / lactation day:'}</span>
+                <span className="text-teal-300 font-mono font-bold">{dynamicYieldModel.rollingMean} kg/cow · D{dynamicYieldModel.lactationDay}</span>
               </div>
               <div className="flex justify-between items-center pt-1 border-t border-slate-800 text-[11px]">
                 <span className="text-slate-400">{isHindi ? 'अनुमानित भुगतान दर:' : 'Estimated Rate:'}</span>
@@ -228,6 +283,27 @@ export default function AggregatorTablet() {
               </div>
             </div>
           </div>
+            <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 space-y-3">
+              <div className="text-xs font-bold text-sky-200">Fast farmer collection request</div>
+              <div className="flex gap-2">
+                <input value={requestFarmerId} onChange={(e) => setRequestFarmerId(e.target.value)} list="farmer-id-list" placeholder="Enter Farmer ID" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 p-2.5 text-xs text-white" />
+                <datalist id="farmer-id-list">{farmers.map(farmer => <option key={farmer.farmerId} value={farmer.farmerId}>{farmer.name}</option>)}</datalist>
+                <button onClick={handleCreateCollectionRequest} className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-slate-950">Request</button>
+              </div>
+              <div className="text-[10px] text-slate-300">Auto location: <strong className="text-sky-300">{selectedFarmer.nodeId} · {selectedFarmer.district}, {selectedFarmer.state}</strong></div>
+              <label className="block text-[10px] text-slate-300">Requested milk amount (kg)<input type="number" min="0.1" step="0.1" value={requestAmountKg} onChange={e => setRequestAmountKg(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2.5 text-xs text-white" /></label>
+              <div className="flex gap-2">{['MORNING', 'EVENING'].map(session => <button key={session} onClick={() => setRequestSession(session)} className={`rounded border px-2 py-1 text-[10px] font-bold ${requestSession === session ? 'border-sky-400 bg-sky-500/20 text-sky-200' : 'border-slate-700 text-slate-400'}`}>{session}</button>)}</div>
+              {requestNotice && <div className="text-[10px] text-emerald-300">{requestNotice}</div>}
+              <div className="text-[10px] text-slate-400">Nearby farmers: {farmers.filter(farmer => farmer.nodeId === selectedFarmer.nodeId).map(farmer => farmer.name).join(', ') || 'None'}</div>
+              {ineligibleAnimals.length > 0 && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[10px] text-amber-200">{ineligibleAnimals.length} animal(s) marked pregnant/recovery. Collection will pause for those animals.</div>}
+            </div>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
+              <div className="flex items-center justify-between"><div className="text-xs font-bold text-emerald-200">Farmer-approved milk requests</div><span className="text-[10px] text-slate-300">{collectionRequests.filter(request => request.farmerApproval === 'APPROVED').length} approved</span></div>
+              {collectionRequests.filter(request => request.farmerApproval === 'APPROVED' && request.status !== 'MEASUREMENTS_RECORDED').map(request => <div key={request.requestId} className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-xs"><div className="flex items-center justify-between"><div><b className="text-white">{request.farmerName}</b><div className="text-[10px] text-slate-400">{request.requestedSession} · {request.nodeId} · {request.district}</div></div><button onClick={() => setMeasurementRequestId(request.requestId)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[10px] font-bold text-slate-950">Enter collection data</button></div><div className="mt-2 text-[10px] text-slate-400">Farmer reference yield: <b className="text-emerald-300">{calculateDynamicYieldBound({ farmer: farmers.find(farmer => farmer.farmerId === request.farmerId), pourEvents }).perCowBound} kg/animal</b>. Enter your independent scale and test readings below.</div></div>)}
+              {collectionRequests.filter(request => request.farmerApproval === 'APPROVED').length === 0 && <div className="text-[10px] text-slate-400">No farmer-approved requests yet.</div>}
+              {collectionRequests.filter(request => request.status === 'MEASUREMENTS_RECORDED').map(request => <div key={request.requestId} className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-xs"><div className="flex justify-between"><b className="text-white">{request.farmerName} · readings recorded</b><span className={request.comparison?.withinDynamicBound ? 'text-emerald-300' : 'text-rose-300'}>{request.comparison?.withinDynamicBound ? 'Within bound' : 'Review variance'}</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400"><span>Aggregator: <b className="text-white">{request.aggregatorMeasurements?.weightKg} kg</b></span><span>System: <b className="text-emerald-300">{request.expectedYieldKg} kg</b></span><span>Difference: <b className="text-amber-300">{request.comparison?.differenceKg} kg</b></span></div><button onClick={() => { setTransferRequestId(request.requestId); setTransferDetails(previous => ({ ...previous, amountKg: request.aggregatorMeasurements?.weightKg || '' })); }} className="mt-3 w-full rounded-lg bg-teal-500 px-3 py-2 text-[10px] font-extrabold text-slate-950">Transfer to chilling centre</button></div>)}
+              {collectionRequests.filter(request => request.status === 'TRANSFERRED_TO_CHILLING_CENTER').map(request => <div key={request.requestId} className="rounded-lg border border-teal-500/30 bg-teal-500/10 p-3 text-xs"><div className="flex justify-between"><b className="text-teal-100">{request.farmerName} · transferred</b><span className="text-teal-300">CHILLING CENTRE</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-300"><span>Amount: <b>{request.transfer?.amountKg} kg</b></span><span>Fat: <b>{request.transfer?.fatPercent}%</b></span><span>SNF: <b>{request.transfer?.snfPercent}%</b></span></div><div className="mt-1 text-[10px] text-slate-400">Destination {request.transfer?.destinationNodeId} · Vehicle {request.transfer?.vehicleId} · Seal {request.transfer?.sealId}</div></div>)}
+            </div>
 
           <button
             onClick={() => setShowManifestQR(true)}
@@ -282,9 +358,12 @@ export default function AggregatorTablet() {
               <div className="p-4 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs space-y-2 animate-in fade-in">
                 <div className="flex items-center gap-2 font-bold text-rose-400">
                   <ShieldAlert className="w-5 h-5 text-rose-500" />
-                  <span>{isHindi ? 'एआई डायनामिक उपज उल्लंघन — स्वतः निरस्त' : 'AI DYNAMIC YIELD VIOLATION — AUTO-REJECTED'}</span>
+                  <span>{isHindi ? 'गतिशील जैविक उपज उल्लंघन — स्वतः निरस्त' : 'DYNAMIC BIOLOGICAL BOUND — AUTO-REJECTED'}</span>
                 </div>
                 <p className="text-[11px] leading-snug opacity-95">{yieldViolationError.reason}</p>
+                <div className="text-[10px] text-rose-300 font-mono">
+                  {isHindi ? 'Wood चरण मॉडल' : 'Wood lactation curve'} · μ {yieldViolationError.model.rollingMean} · σ {yieldViolationError.model.rollingStdDev} · S {yieldViolationError.model.seasonalFactor}
+                </div>
                 <div className="text-[10px] text-rose-300 font-mono bg-slate-950 p-2 rounded border border-rose-500/30">
                   {isHindi ? 'FSSAI जिला अलर्ट दर्ज किया गया • करनाल अधिकारी को एसएमएस अलर्ट भेजा गया' : 'FSSAI District Alert Logged • SMS alert dispatched to Karnal Officer'}
                 </div>
@@ -368,10 +447,10 @@ export default function AggregatorTablet() {
                 <div className="space-y-2 text-slate-300">
                   <div className="flex items-center gap-2 text-teal-400 font-bold">
                     <FileCheck className="w-4 h-4 text-teal-400" />
-                    <span>Phase 3: AI Dynamic Yield Verification & Anchoring</span>
+                    <span>Phase 3: Dynamic Biological Yield Verification</span>
                   </div>
                   <div className="text-[11px] text-emerald-400 font-bold">
-                    ✓ Biological Limit Passed ({signingModal.payload?.weightKg}kg ≤ {selectedFarmer.registeredCows * 12.0}kg)
+                    Dynamic Bound Passed ({signingModal.payload?.weightKg}kg ≤ {signingModal.payload?.dynamicYieldModel?.herdBound}kg)
                   </div>
                   <div className="text-[10px] text-slate-400 break-all">
                     Digest: {signingModal.shaHash}
@@ -390,6 +469,7 @@ export default function AggregatorTablet() {
                   <div className="text-2xl font-extrabold text-emerald-400">
                     ₹{signingModal.payoutAmt} <span className="text-xs text-slate-400">Direct Bank Credit</span>
                   </div>
+                  <div className="text-xs text-amber-300">Payment status: {signingModal.payload?.paymentStatus || 'PENDING_AGGREGATOR_CONFIRMATION'}</div>
                   <div className="text-[10px] text-slate-400">
                     Farmer: {signingModal.payload?.farmerName} ({signingModal.payload?.farmerId})
                   </div>
@@ -399,13 +479,38 @@ export default function AggregatorTablet() {
 
             {/* Action Footer */}
             {signingModal.step === 4 && (
-              <button
-                onClick={() => setSigningModal(prev => ({ ...prev, isOpen: false }))}
-                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-xl uppercase tracking-wider"
-              >
-                {isHindi ? 'पूर्ण / बंद करें' : 'Done / Close Receipt'}
-              </button>
+              <div className="space-y-2">
+                {signingModal.payload?.paymentStatus !== 'PAID' && <button onClick={() => { markPourPaid(signingModal.payload?.eventId); setSigningModal(prev => ({ ...prev, payload: { ...prev.payload, paymentStatus: 'PAID' } })); }} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-xl uppercase tracking-wider">Mark payment confirmed</button>}
+                <button onClick={() => setSigningModal(prev => ({ ...prev, isOpen: false }))} className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold text-xs rounded-xl uppercase tracking-wider">{isHindi ? 'पूर्ण / बंद करें' : 'Done / Close Receipt'}</button>
+              </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeMeasurementRequest && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 space-y-4">
+            <div className="flex items-start justify-between"><div><h3 className="text-base font-bold text-white">Record independent collection data</h3><p className="mt-1 text-xs text-slate-400">{activeMeasurementRequest.farmerName} · {activeMeasurementRequest.requestedSession}</p></div><button onClick={() => setMeasurementRequestId(null)} className="text-xs text-slate-400">Close</button></div>
+            <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">Farmer reference only: {calculateDynamicYieldBound({ farmer: farmers.find(farmer => farmer.farmerId === activeMeasurementRequest.farmerId), pourEvents }).perCowBound} kg/animal. These fields are entered by the aggregator and are not copied from the farmer.</div>
+            <div className="grid grid-cols-3 gap-2">{[['weightKg', 'Weight kg'], ['fatPercent', 'Fat %'], ['snfPercent', 'SNF %']].map(([field, label]) => <label key={field} className="text-[10px] text-slate-400">{label}<input type="number" step="0.1" value={measurements[field]} onChange={e => setMeasurements({ ...measurements, [field]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-sm text-white" /></label>)}</div>
+            <div className="grid grid-cols-2 gap-2"><label className="text-[10px] text-slate-400">Temperature °C<input type="number" step="0.1" value={measurements.temperatureC} onChange={e => setMeasurements({ ...measurements, temperatureC: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-sm text-white" /></label><label className="text-[10px] text-slate-400">Adulteration check<select value={measurements.adulterationCheck} onChange={e => setMeasurements({ ...measurements, adulterationCheck: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-sm text-white"><option>PASS</option><option>FLAG</option></select></label></div>
+            <textarea value={measurements.notes} onChange={e => setMeasurements({ ...measurements, notes: e.target.value })} placeholder="Aggregator notes" className="min-h-20 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-white placeholder:text-slate-500" />
+            <button onClick={saveMeasurements} className="w-full rounded-lg bg-emerald-500 py-3 text-xs font-extrabold text-slate-950">Save aggregator readings and compare</button>
+          </div>
+        </div>
+      )}
+
+      {activeTransferRequest && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-teal-500/40 bg-slate-900 p-6 space-y-4">
+            <div className="flex items-start justify-between"><div><h3 className="text-base font-bold text-white">Transfer milk to chilling centre</h3><p className="mt-1 text-xs text-slate-400">Source {activeTransferRequest.nodeId} · {activeTransferRequest.farmerName}</p></div><button onClick={() => setTransferRequestId(null)} className="text-xs text-slate-400">Close</button></div>
+            <div className="rounded-lg border border-teal-500/30 bg-teal-500/10 p-3 text-xs text-teal-200">Enter the aggregator’s transfer readings. This is a new custody record for the chilling centre, separate from the farmer and collection readings.</div>
+            <label className="block text-[10px] text-slate-400">Destination chilling centre<select value={transferDetails.destinationNodeId} onChange={e => setTransferDetails({ ...transferDetails, destinationNodeId: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2.5 text-sm text-white"><option>MCC-KNL-01</option><option>MCC-KTL-01</option><option>MCC-HSR-01</option><option>PLANT-KNL-01</option></select></label>
+            <div className="grid grid-cols-3 gap-2">{[['amountKg', 'Amount kg'], ['fatPercent', 'Fat %'], ['snfPercent', 'SNF %']].map(([field, label]) => <label key={field} className="text-[10px] text-slate-400">{label}<input required type="number" step="0.1" value={transferDetails[field]} onChange={e => setTransferDetails({ ...transferDetails, [field]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-sm text-white" /></label>)}</div>
+            <div className="grid grid-cols-2 gap-2">{[['temperatureC', 'Temperature °C'], ['vehicleId', 'Vehicle / tanker ID'], ['sealId', 'Transfer seal ID']].map(([field, label]) => <label key={field} className="text-[10px] text-slate-400">{label}<input required type={field === 'temperatureC' ? 'number' : 'text'} step={field === 'temperatureC' ? '0.1' : undefined} value={transferDetails[field]} onChange={e => setTransferDetails({ ...transferDetails, [field]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2.5 text-sm text-white" /></label>)}</div>
+            <textarea value={transferDetails.notes} onChange={e => setTransferDetails({ ...transferDetails, notes: e.target.value })} placeholder="Transfer notes" className="min-h-20 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-white placeholder:text-slate-500" />
+            <button onClick={saveTransfer} className="w-full rounded-lg bg-teal-500 py-3 text-xs font-extrabold text-slate-950">Confirm transfer to chilling centre</button>
           </div>
         </div>
       )}

@@ -137,7 +137,7 @@ export default function RegisteredIdAuthModal() {
             <div className="flex items-center gap-2.5">
               <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
               <div>
-                <div className="font-extrabold text-amber-300 group-hover:text-amber-200">🔑 {isHindi ? 'मास्टर एडमिन पासकोड से त्वरित लॉगिन' : 'Quick Login with Master Admin Passcode'}</div>
+                  <div className="flex items-center gap-1.5 font-extrabold text-amber-300 group-hover:text-amber-200"><Key className="h-3.5 w-3.5" /> {isHindi ? 'मास्टर एडमिन पासकोड से त्वरित लॉगिन' : 'Quick Login with Master Admin Passcode'}</div>
                 <div className="text-[10px] text-slate-300 font-mono">{isHindi ? 'मास्टर पासकोड:' : 'Master Passcode:'} <span className="text-emerald-400 font-bold">1234</span> ({isHindi ? 'सभी पोर्टल खोलता है' : 'Unlocks ALL Portals'})</div>
               </div>
             </div>

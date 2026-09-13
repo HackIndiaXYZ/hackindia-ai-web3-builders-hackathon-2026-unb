@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAnveshana } from '../context/AnveshanaContext';
+import { calculateDynamicYieldBound, useAnveshana } from '../context/AnveshanaContext';
 import {
   Volume2,
   Award,
@@ -28,12 +28,13 @@ import {
   Check,
   TrendingUp,
   Clock,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function FarmerPWA() {
-  const { farmers, pourEvents, addPourEvent, setActiveEvidenceModal, language, isOnline } = useAnveshana();
+  const { farmers, pourEvents, addPourEvent, setActiveEvidenceModal, language, isOnline, registerNdlmAnimal, ndlmVerificationCases, collectionRequests, approveCollectionRequest } = useAnveshana();
   const farmer = farmers[0] || {
     farmerId: '201410000123',
     name: 'Ramesh Kumar',
@@ -50,6 +51,9 @@ export default function FarmerPWA() {
   const [showQuickPourModal, setShowQuickPourModal] = useState(false);
   const [showKccModal, setShowKccModal] = useState(false);
   const [showAddCattleModal, setShowAddCattleModal] = useState(false);
+  const [registrationNotice, setRegistrationNotice] = useState(null);
+  const [showCollectionRequestModal, setShowCollectionRequestModal] = useState(false);
+  const [ignoredRequestIds, setIgnoredRequestIds] = useState([]);
   
   const [kccStatus, setKccStatus] = useState('IDLE'); // 'IDLE' | 'SUBMITTING' | 'APPROVED'
   const [spoken, setSpoken] = useState(false);
@@ -67,14 +71,19 @@ export default function FarmerPWA() {
 
   // Cattle Data List
   const [cattleList, setCattleList] = useState([
-    { id: '1', breed: 'Murrah Buffalo (मुर्रा भैंस)', ndlmTag: '840003129940112', dailyYield: '12.5 L/day', status: 'HEALTHY', vaccination: 'FMD Verified', icon: '🐂' },
-    { id: '2', breed: 'Sahiwal Cow (साहीवाल गाय)', ndlmTag: '840003129940113', dailyYield: '9.0 L/day', status: 'HEALTHY', vaccination: 'HS Booster Done', icon: '🐄' },
-    { id: '3', breed: 'Gir Cow (गीर गाय)', ndlmTag: '840003129940114', dailyYield: '10.2 L/day', status: 'HEALTHY', vaccination: 'Brucellosis Clear', icon: '🐄' },
-    { id: '4', breed: 'Murrah Buffalo (मुर्रा भैंस #2)', ndlmTag: '840003129940115', dailyYield: '11.8 L/day', status: 'HEALTHY', vaccination: 'FMD Verified', icon: '🐂' }
+    { id: '1', breed: 'Murrah Buffalo (मुर्रा भैंस)', ndlmTag: '840003129940112', dailyYield: '12.5 L/day', status: 'HEALTHY', vaccination: 'FMD Verified' },
+    { id: '2', breed: 'Sahiwal Cow (साहीवाल गाय)', ndlmTag: '840003129940113', dailyYield: '9.0 L/day', status: 'HEALTHY', vaccination: 'HS Booster Done' },
+    { id: '3', breed: 'Gir Cow (गीर गाय)', ndlmTag: '840003129940114', dailyYield: '10.2 L/day', status: 'HEALTHY', vaccination: 'Brucellosis Clear' },
+    { id: '4', breed: 'Murrah Buffalo (मुर्रा भैंस #2)', ndlmTag: '840003129940115', dailyYield: '11.8 L/day', status: 'HEALTHY', vaccination: 'FMD Verified' }
   ]);
 
   const [newTagInput, setNewTagInput] = useState('');
   const [newBreedInput, setNewBreedInput] = useState('Sahiwal Cow');
+  const [newCattleForm, setNewCattleForm] = useState({
+    animalName: '', sex: 'Female', dateOfBirth: '', ownerMobile: '', village: '', district: 'Karnal',
+    vaccinationStatus: 'Vaccination record pending', lastVaccinationDate: '', calvingDate: '', insuranceStatus: 'Not insured', consent: false
+    ,pregnancyStatus: 'NOT_PREGNANT', postCalvingRecovery: false
+  });
 
   const latestPour = pourEvents[0] || {
     eventId: 'PE-20260831-001',
@@ -84,6 +93,28 @@ export default function FarmerPWA() {
     payoutINR: 382.50,
     timestamp: new Date().toISOString()
   };
+  const farmerYieldModel = calculateDynamicYieldBound({ farmer, pourEvents });
+
+  React.useEffect(() => {
+    if (!ndlmVerificationCases.length) return;
+    setCattleList(previous => {
+      const mapped = previous.map(animal => {
+        const verification = ndlmVerificationCases.find(item => item.ndlmTag === animal.ndlmTag);
+        return verification ? { ...animal, ...verification, verificationStatus: verification.status, status: verification.status === 'VERIFIED' ? 'VERIFIED' : animal.status } : animal;
+      });
+      const missing = ndlmVerificationCases
+        .filter(verification => !mapped.some(animal => animal.ndlmTag === verification.ndlmTag))
+        .map(verification => ({ ...verification, id: verification.verificationId, ndlmTag: verification.ndlmTag, vaccination: verification.vaccinationStatus || 'Record submitted', dailyYield: `${verification.estimatedYieldKg || 'Pending'} kg/day`, status: verification.status === 'VERIFIED' ? 'VERIFIED' : 'PENDING', verificationStatus: verification.status }));
+      return [...missing, ...mapped];
+    });
+  }, [ndlmVerificationCases]);
+
+  const pendingCollectionRequests = collectionRequests.filter(request => request.farmerId === farmer.farmerId && request.farmerApproval === 'PENDING');
+  const activeCollectionRequest = pendingCollectionRequests.find(request => !ignoredRequestIds.includes(request.requestId)) || null;
+
+  React.useEffect(() => {
+    if (activeCollectionRequest) setShowCollectionRequestModal(true);
+  }, [activeCollectionRequest?.requestId]);
 
   // Dual Language Translation Dictionary
   const t = {
@@ -211,6 +242,7 @@ export default function FarmerPWA() {
       weightKg: w,
       fatPercent: f,
       snfPercent: s,
+      session: new Date().getHours() < 14 ? 'MORNING' : 'EVENING',
       yieldStatus: 'PASS'
     });
 
@@ -230,20 +262,57 @@ export default function FarmerPWA() {
   // Add Cattle Handler
   const handleAddCattle = (e) => {
     e.preventDefault();
-    if (!newTagInput.trim()) return;
+    if (!newTagInput.trim() || Object.entries(newCattleForm).some(([key, value]) => key !== 'consent' && !String(value).trim()) || !newCattleForm.consent) return;
     const newAnimal = {
       id: String(Date.now()),
+      farmerId: farmer.farmerId,
       breed: `${newBreedInput} (NDLM)`,
       ndlmTag: newTagInput.trim(),
+      animalName: newCattleForm.animalName,
+      sex: newCattleForm.sex,
+      dateOfBirth: newCattleForm.dateOfBirth,
+      ownerMobile: newCattleForm.ownerMobile,
+      village: newCattleForm.village,
+      district: newCattleForm.district,
+      vaccinationStatus: newCattleForm.vaccinationStatus,
+      lastVaccinationDate: newCattleForm.lastVaccinationDate,
+      calvingDate: newCattleForm.calvingDate,
+      insuranceStatus: newCattleForm.insuranceStatus,
+      pregnancyStatus: newCattleForm.pregnancyStatus,
+      postCalvingRecovery: newCattleForm.postCalvingRecovery,
       dailyYield: '10.5 L/day',
       status: 'HEALTHY',
-      vaccination: 'FMD Verified',
-      icon: newBreedInput.includes('Cow') ? '🐄' : '🐂'
+      vaccination: newCattleForm.vaccinationStatus,
+      verificationStatus: 'SUBMITTED_FOR_FIELD_VERIFICATION'
     };
+    registerNdlmAnimal(newAnimal);
     setCattleList([...cattleList, newAnimal]);
+    setRegistrationNotice({ name: newAnimal.animalName, tag: newAnimal.ndlmTag, status: 'PENDING_REVIEW' });
+    setActiveTab('CATTLE');
     setNewTagInput('');
+    setNewCattleForm({ animalName: '', sex: 'Female', dateOfBirth: '', ownerMobile: '', village: '', district: 'Karnal', vaccinationStatus: 'Vaccination record pending', lastVaccinationDate: '', calvingDate: '', insuranceStatus: 'Not insured', consent: false, pregnancyStatus: 'NOT_PREGNANT', postCalvingRecovery: false });
     setShowAddCattleModal(false);
     confetti({ particleCount: 50, spread: 50 });
+  };
+
+  const prefillNdlmDemo = () => {
+    setNewBreedInput('Sahiwal Cow');
+    setNewTagInput('840003129940999');
+    setNewCattleForm({
+      animalName: 'Ganga',
+      sex: 'Female',
+      dateOfBirth: '2022-01-01',
+      ownerMobile: '9876543210',
+      village: 'Nissing',
+      district: 'Karnal',
+      vaccinationStatus: 'FMD and HS verified',
+      lastVaccinationDate: '2026-08-01',
+      calvingDate: '2026-02-15',
+      insuranceStatus: 'Insurance active',
+      consent: true,
+      pregnancyStatus: 'NOT_PREGNANT',
+      postCalvingRecovery: false
+    });
   };
 
   // Calculator Helper Rate Formula
@@ -423,8 +492,8 @@ export default function FarmerPWA() {
                           {new Date(pour.timestamp).toLocaleString()} • Station: {pour.nodeId || 'VLC-22'}
                         </div>
                       </div>
-                      <span className="text-emerald-400 font-bold bg-emerald-950/90 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-sm font-mono">
-                        ₹{pour.payoutINR} {text.directPayout}
+                      <span className={`font-bold px-3 py-1.5 rounded-xl border text-sm font-mono ${pour.paymentStatus === 'PAID' ? 'text-emerald-400 bg-emerald-950/90 border-emerald-500/40' : 'text-amber-300 bg-amber-950/70 border-amber-500/40'}`}>
+                        ₹{pour.payoutINR} {pour.paymentStatus === 'PAID' ? text.directPayout : 'Payment pending aggregator confirmation'}
                       </span>
                     </div>
 
@@ -480,13 +549,53 @@ export default function FarmerPWA() {
                   <span>{text.addCattle}</span>
                 </button>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40">
+                  <div className="text-[10px] text-emerald-300 uppercase font-mono">System estimated yield</div>
+                  <div className="text-lg font-extrabold text-emerald-400">{farmerYieldModel.perCowBound} kg / animal</div>
+                  <div className="text-[10px] text-slate-400">Lactation day {farmerYieldModel.lactationDay} · seasonal factor {farmerYieldModel.seasonalFactor}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-950/30">
+                  <div className="text-[10px] text-sky-300 uppercase font-mono">Dynamic bound</div>
+                  <div className="text-lg font-extrabold text-sky-400">{farmerYieldModel.herdBound} kg / herd</div>
+                  <div className="text-[10px] text-slate-400">Based on 7-day mean and breed peak</div>
+                </div>
+                <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/30">
+                  <div className="text-[10px] text-amber-300 uppercase font-mono">Verification queue</div>
+                  <div className="text-lg font-extrabold text-amber-400">{ndlmVerificationCases.filter(item => item.status !== 'VERIFIED').length}</div>
+                  <div className="text-[10px] text-slate-400">Your registrations awaiting field review</div>
+                </div>
+              </div>
+
+              {registrationNotice && (
+                <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
+                    <div>
+                      <div className="text-sm font-bold text-sky-300">Registration received for {registrationNotice.name}</div>
+                      <div className="mt-1 text-xs text-slate-300">NDLM tag #{registrationNotice.tag} is now visible below.</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-mono"><span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">PENDING REVIEW</span><span className="text-slate-400">Officer visit, field evidence, and approval are next.</span></div>
+                    </div>
+                    <button onClick={() => setRegistrationNotice(null)} className="ml-auto text-xs text-slate-400 hover:text-white">Dismiss</button>
+                  </div>
+                </div>
+              )}
+
+              {pendingCollectionRequests.map(request => (
+                <div key={request.requestId} className="rounded-xl border border-sky-500/40 bg-sky-500/10 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><div className="text-sm font-bold text-sky-200">Milk collection request received</div><div className="mt-1 text-xs text-slate-300">{request.requestedSession} · {request.nodeId} · {request.district}, {request.state}</div><div className="mt-1 text-[10px] font-mono text-slate-400">Requested {new Date(request.createdAt).toLocaleString()}</div></div>
+                    <div className="flex gap-2"><button onClick={() => { setShowCollectionRequestModal(true); }} className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-slate-950">Review request</button><span className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400">Pending</span></div>
+                  </div>
+                </div>
+              ))}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cattleList.map((item) => (
                   <div key={item.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl">
-                        {item.icon}
+                        <ShieldCheck className="h-6 w-6 text-emerald-400" />
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white">{item.breed}</div>
@@ -499,6 +608,7 @@ export default function FarmerPWA() {
                           </span>
                           <span>• {item.dailyYield}</span>
                         </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-1">NDLM: {item.verificationStatus || 'ACTIVE'}</div>
                       </div>
                     </div>
 
@@ -510,6 +620,41 @@ export default function FarmerPWA() {
                   </div>
                 ))}
               </div>
+
+              {showCollectionRequestModal && activeCollectionRequest && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-md rounded-2xl border border-sky-500/40 bg-slate-900 p-6 shadow-2xl">
+                    <div className="flex items-start justify-between border-b border-slate-700 pb-4">
+                      <div><div className="text-[10px] font-mono font-bold uppercase tracking-wider text-sky-300">New collection request</div><h3 className="mt-1 text-lg font-extrabold text-white">Milk collection requested</h3></div>
+                      <button onClick={() => setShowCollectionRequestModal(false)} className="text-xs text-slate-400 hover:text-white">Close</button>
+                    </div>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="rounded-xl border border-slate-700 bg-slate-800 p-4"><div className="font-bold text-white">{activeCollectionRequest.requestedSession} collection</div><div className="mt-1 text-sm font-bold text-sky-300">Requested amount: {activeCollectionRequest.requestedAmountKg} kg</div><div className="mt-1 text-xs text-slate-300">Collection point: {activeCollectionRequest.nodeId}</div><div className="text-xs text-slate-400">{activeCollectionRequest.district}, {activeCollectionRequest.state}</div><div className="mt-2 text-[10px] font-mono text-slate-500">Requested {new Date(activeCollectionRequest.createdAt).toLocaleString()}</div></div>
+                      <p className="text-xs leading-relaxed text-slate-300">Approve to let the aggregator record independent weight, fat, SNF, temperature, and quality readings. Decline if you are unavailable. Ignore keeps this request pending.</p>
+                    </div>
+                    <div className="mt-5 grid grid-cols-3 gap-2"><button onClick={() => { approveCollectionRequest(activeCollectionRequest.requestId, 'APPROVED'); setShowCollectionRequestModal(false); }} className="rounded-lg bg-emerald-500 px-3 py-3 text-xs font-extrabold text-slate-950">Approve</button><button onClick={() => { approveCollectionRequest(activeCollectionRequest.requestId, 'DECLINED'); setShowCollectionRequestModal(false); }} className="rounded-lg border border-rose-500/50 px-3 py-3 text-xs font-bold text-rose-300">Decline</button><button onClick={() => { setIgnoredRequestIds(previous => [...previous, activeCollectionRequest.requestId]); setShowCollectionRequestModal(false); }} className="rounded-lg border border-slate-600 px-3 py-3 text-xs font-bold text-slate-300">Ignore</button></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
+                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-3"><ShieldCheck className="h-4 w-4 text-emerald-600" /><h4 className="text-sm font-bold text-slate-900">NDLM verification process</h4></div>
+                  <ol className="space-y-2 text-xs text-slate-600 list-decimal pl-4">
+                    <li>Owner and animal details are submitted with the 15-digit ear tag.</li>
+                    <li>A trained field worker scans the RFID tag and checks the animal record.</li>
+                    <li>Vaccination, health, breeding, and location data are linked to the animal identity.</li>
+                    <li>Duplicate or invalid tags are held for correction; verified records become active.</li>
+                  </ol>
+                  <p className="mt-3 text-[11px] text-slate-500">Need a correction or field visit? Contact your local livestock office or the 1962 farmer service.</p>
+                </div>
+                <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex items-center gap-2 mb-3"><Building2 className="h-4 w-4 text-emerald-600" /><h4 className="text-sm font-bold text-slate-900">Services unlocked by a verified record</h4></div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                    {['Animal health and vaccination history', 'Breeding, pregnancy and calving records', '1962 veterinary support and advisories', 'Livestock insurance and claim readiness', 'KCC and dairy credit documentation', 'Eligibility for livestock schemes'].map(service => <div key={service} className="border-l-2 border-emerald-400 pl-2 py-1">{service}</div>)}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -518,7 +663,7 @@ export default function FarmerPWA() {
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="glass-panel-glow p-6 rounded-3xl border border-emerald-500/40 text-center relative overflow-hidden space-y-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400/40 mx-auto flex items-center justify-center text-emerald-400 text-3xl">
-                  🏛️
+                  <Building2 className="h-7 w-7" />
                 </div>
                 <h3 className="text-lg font-bold text-white">{text.kccHeader}</h3>
                 <p className="text-xs text-slate-300 max-w-md mx-auto">{text.kccSub}</p>
@@ -653,7 +798,7 @@ export default function FarmerPWA() {
                 onClick={() => setShowQuickPourModal(false)}
                 className="text-slate-400 hover:text-white font-bold"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -695,32 +840,8 @@ export default function FarmerPWA() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-slate-300 block mb-1">{text.sessionLabel}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPourSession('MORNING')}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                      pourSession === 'MORNING'
-                        ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {text.morning}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPourSession('EVENING')}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                      pourSession === 'EVENING'
-                        ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {text.evening}
-                  </button>
-                </div>
+              <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
+                Session is automatic: <strong>{new Date().getHours() < 14 ? text.morning : text.evening}</strong>. The system uses the collection time.
               </div>
 
               <div className="pt-2 flex gap-2">
@@ -749,7 +870,7 @@ export default function FarmerPWA() {
           <div className="glass-panel p-6 rounded-3xl max-w-md w-full border border-emerald-500/40 relative animate-in fade-in zoom-in duration-200 space-y-4">
             <div className="text-center space-y-2">
               <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-400/40 mx-auto flex items-center justify-center text-emerald-400 text-3xl">
-                🏛️
+                  <Building2 className="h-7 w-7" />
               </div>
               <h3 className="text-lg font-bold text-white">{text.kccHeader}</h3>
               <p className="text-xs text-slate-400">{text.kccSub}</p>
@@ -812,20 +933,27 @@ export default function FarmerPWA() {
       {/* MODAL 3: ADD CATTLE NDLM TAG MODAL */}
       {showAddCattleModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-panel p-6 rounded-3xl max-w-md w-full border border-emerald-500/40 relative animate-in fade-in zoom-in duration-200 space-y-4">
+          <div className="glass-panel p-6 rounded-3xl max-w-3xl max-h-[92vh] overflow-y-auto w-full border border-emerald-500/40 relative animate-in fade-in zoom-in duration-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-400" />
-                <span>{text.addCattle}</span>
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <span>Register animal on NDLM / Pashudhan</span>
               </h3>
               <button onClick={() => setShowAddCattleModal(false)} className="text-slate-400 hover:text-white font-bold">
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddCattle} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-300 block mb-1 font-medium">Select Cattle Breed</label>
+            <form onSubmit={handleAddCattle} className="space-y-4 text-xs">
+              <p className="text-slate-400">Complete the required owner, identity, location, health, and breeding details. Submission status will remain pending until field verification.</p>
+              <button type="button" onClick={prefillNdlmDemo} className="w-full rounded-xl border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-left text-xs font-bold text-sky-300 hover:bg-sky-500/20">Load demo registration details</button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Animal name / local identifier *</label>
+                  <input required value={newCattleForm.animalName} onChange={(e) => setNewCattleForm({ ...newCattleForm, animalName: e.target.value })} placeholder="e.g. Ganga" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Breed *</label>
                 <select
                   value={newBreedInput}
                   onChange={(e) => setNewBreedInput(e.target.value)}
@@ -837,18 +965,54 @@ export default function FarmerPWA() {
                   <option value="HF Crossbred">HF Crossbred (एचएफ गाय)</option>
                 </select>
               </div>
-
-              <div>
-                <label className="text-slate-300 block mb-1 font-medium">NDLM Ear Tag Number (15 Digits)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 840003129940116"
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-emerald-400 font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                />
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">NDLM / Pashu Aadhaar ear tag *</label>
+                  <input type="text" required pattern="[0-9]{15}" maxLength={15} placeholder="15-digit tag" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value.replace(/\D/g, ''))} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-emerald-400 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Sex *</label>
+                  <select value={newCattleForm.sex} onChange={(e) => setNewCattleForm({ ...newCattleForm, sex: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none"><option>Female</option><option>Male</option></select>
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Date of birth / age *</label>
+                  <input required type="date" value={newCattleForm.dateOfBirth} onChange={(e) => setNewCattleForm({ ...newCattleForm, dateOfBirth: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Owner mobile *</label>
+                  <input required type="tel" pattern="[0-9]{10}" maxLength={10} value={newCattleForm.ownerMobile} onChange={(e) => setNewCattleForm({ ...newCattleForm, ownerMobile: e.target.value.replace(/\D/g, '') })} placeholder="10-digit mobile" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Village / panchayat *</label>
+                  <input required value={newCattleForm.village} onChange={(e) => setNewCattleForm({ ...newCattleForm, village: e.target.value })} placeholder="Village name" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">District *</label>
+                  <input required value={newCattleForm.district} onChange={(e) => setNewCattleForm({ ...newCattleForm, district: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Last vaccination date *</label>
+                  <input required type="date" value={newCattleForm.lastVaccinationDate} onChange={(e) => setNewCattleForm({ ...newCattleForm, lastVaccinationDate: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Vaccination / health status *</label>
+                  <select value={newCattleForm.vaccinationStatus} onChange={(e) => setNewCattleForm({ ...newCattleForm, vaccinationStatus: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none"><option>Vaccination record pending</option><option>FMD verified</option><option>HS verified</option><option>FMD and HS verified</option></select>
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Latest calving date *</label>
+                  <input required type="date" value={newCattleForm.calvingDate} onChange={(e) => setNewCattleForm({ ...newCattleForm, calvingDate: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Insurance status *</label>
+                  <select value={newCattleForm.insuranceStatus} onChange={(e) => setNewCattleForm({ ...newCattleForm, insuranceStatus: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none"><option>Not insured</option><option>Insurance active</option><option>Claim in progress</option></select>
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1 font-medium">Pregnancy status *</label>
+                  <select value={newCattleForm.pregnancyStatus} onChange={(e) => setNewCattleForm({ ...newCattleForm, pregnancyStatus: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-emerald-500 focus:outline-none"><option value="NOT_PREGNANT">Not pregnant</option><option value="PREGNANT">Pregnant</option></select>
+                </div>
+                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={newCattleForm.postCalvingRecovery} onChange={(e) => setNewCattleForm({ ...newCattleForm, postCalvingRecovery: e.target.checked })} className="accent-emerald-600" /> Recently calved / recovery period: pause milk collection</label>
               </div>
+
+              <label className="flex items-start gap-2 text-slate-300"><input type="checkbox" required checked={newCattleForm.consent} onChange={(e) => setNewCattleForm({ ...newCattleForm, consent: e.target.checked })} className="mt-0.5 accent-emerald-600" /><span>I confirm these animal and owner details are correct and consent to NDLM/Anveshana verification. *</span></label>
 
               <div className="pt-2 flex gap-2">
                 <button

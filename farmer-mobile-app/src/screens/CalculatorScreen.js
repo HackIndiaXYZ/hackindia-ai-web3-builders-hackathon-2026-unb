@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   StyleSheet,
   Text,
   View,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  SafeAreaView
+  ScrollView
 } from 'react-native';
 
 export default function CalculatorScreen({ language }) {
-  const isHindi = language === 'HI';
+  const { t } = useTranslation(language);
   const [weight, setWeight] = useState('10.0');
   const [fat, setFat] = useState('4.5');
   const [snf, setSnf] = useState('8.8');
@@ -22,136 +22,242 @@ export default function CalculatorScreen({ language }) {
   const ratePerLiter = +(f * 7.5 + s * 4.0).toFixed(2);
   const totalPayout = +(w * ratePerLiter).toFixed(2);
 
+  const applyPreset = (pw, pf, ps) => {
+    setWeight(String(pw));
+    setFat(String(pf));
+    setSnf(String(ps));
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <Text style={styles.title}>
-            {isHindi ? '🧮 दूध दर एवं भुगतान कैलकुलेटर' : '🧮 Milk Rate & Payout Calculator'}
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>{isHindi ? 'दूध का वजन (kg)' : 'Milk Weight (kg)'}</Text>
-            <TextInput
-              style={styles.textInput}
-              keyboardType="numeric"
-              value={weight}
-              onChangeText={setWeight}
-            />
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.title}>
+              {t('calcTitle')}
+            </Text>
+            <Text style={styles.sub}>
+              {t('calcFormula')}
+            </Text>
           </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.inputLabel}>{isHindi ? 'फैट (%)' : 'Fat (%)'}</Text>
-              <TextInput
-                style={[styles.textInput, { color: '#34d399' }]}
-                keyboardType="numeric"
-                value={fat}
-                onChangeText={setFat}
-              />
-            </View>
-
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.inputLabel}>{isHindi ? 'एसएनएफ (%)' : 'SNF (%)'}</Text>
-              <TextInput
-                style={[styles.textInput, { color: '#2dd4bf' }]}
-                keyboardType="numeric"
-                value={snf}
-                onChangeText={setSnf}
-              />
-            </View>
-          </View>
-
-          <View style={styles.resultCard}>
-            <View style={styles.resRow}>
-              <Text style={styles.resLabel}>{isHindi ? 'गणना की गई दर:' : 'Calculated Rate:'}</Text>
-              <Text style={styles.resValTeal}>₹{ratePerLiter} / L</Text>
-            </View>
-
-            <View style={styles.resRow}>
-              <Text style={styles.resLabel}>{isHindi ? 'अनुमानित कुल भुगतान:' : 'Est. Total Payout:'}</Text>
-              <Text style={styles.resValGreen}>₹{totalPayout}</Text>
-            </View>
+          <View style={styles.rateBadge}>
+            <Text style={styles.rateBadgeText}>₹{ratePerLiter} / ली</Text>
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        {/* Quick Presets */}
+        <Text style={styles.presetHeading}>{t('quickPresets')}</Text>
+        <View style={styles.presetRow}>
+          <TouchableOpacity
+            style={styles.presetBtn}
+            onPress={() => applyPreset(12, 6.8, 9.0)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.presetText}>🐂 मुर्रा भैंस</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.presetBtn}
+            onPress={() => applyPreset(10, 4.2, 8.6)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.presetText}>🐄 साहीवाल गाय</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.presetBtn}
+            onPress={() => applyPreset(8, 4.8, 8.9)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.presetText}>⭐ गीर गाय</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Weight */}
+        <View style={styles.inputBoxGroup}>
+          <Text style={styles.inputLabel}>{t('milkWeightLiters')}</Text>
+          <TextInput
+            style={styles.inputBox}
+            keyboardType="numeric"
+            value={weight}
+            onChangeText={setWeight}
+          />
+        </View>
+
+        {/* Fat & SNF */}
+        <View style={styles.formRow}>
+          <View style={styles.formCol}>
+            <Text style={styles.inputLabel}>{t('fatPercent')}</Text>
+            <TextInput
+              style={[styles.inputBox, { color: '#15803D' }]}
+              keyboardType="numeric"
+              value={fat}
+              onChangeText={setFat}
+            />
+          </View>
+          <View style={styles.formCol}>
+            <Text style={styles.inputLabel}>{t('snfPercent')}</Text>
+            <TextInput
+              style={[styles.inputBox, { color: '#0284C7' }]}
+              keyboardType="numeric"
+              value={snf}
+              onChangeText={setSnf}
+            />
+          </View>
+        </View>
+
+        {/* Results Card */}
+        <View style={styles.resultCard}>
+          <View style={styles.resultRow}>
+            <Text style={styles.resLabel}>{t('ratePerLiterCalc')}</Text>
+            <Text style={styles.resRate}>₹{ratePerLiter}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.resultRow}>
+            <Text style={styles.resBoldLabel}>{t('totalPayout')}</Text>
+            <Text style={styles.resTotal}>₹{totalPayout}</Text>
+          </View>
+        </View>
+      </View>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 24,
+    gap: 12,
   },
   card: {
-    backgroundColor: '#090d1a',
-    borderColor: '#1e293b',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 18,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    gap: 12,
+    elevation: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   title: {
-    color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    marginBottom: 16,
+    color: '#0F172A',
   },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  inputLabel: {
-    color: '#94a3b8',
+  sub: {
     fontSize: 11,
-    marginBottom: 4,
+    color: '#64748B',
+    marginTop: 2,
   },
-  textInput: {
-    backgroundColor: '#0f172a',
-    borderColor: '#334155',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#ffffff',
-    fontSize: 14,
+  rateBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rateBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  presetHeading: {
+    fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
+    color: '#475569',
+    marginTop: 2,
   },
-  row: {
+  presetRow: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  resultCard: {
-    backgroundColor: '#022c22',
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 10,
     gap: 8,
   },
-  resRow: {
+  presetBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  presetText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  inputBoxGroup: {
+    gap: 4,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  inputBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  formCol: {
+    flex: 1,
+    gap: 4,
+  },
+  resultCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    marginTop: 4,
+  },
+  resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   resLabel: {
-    color: '#cbd5e1',
     fontSize: 12,
+    color: '#475569',
   },
-  resValTeal: {
-    color: '#2dd4bf',
+  resRate: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#DCFCE7',
+  },
+  resBoldLabel: {
     fontSize: 13,
     fontWeight: '800',
-    fontFamily: 'monospace',
+    color: '#0F172A',
   },
-  resValGreen: {
-    color: '#34d399',
-    fontSize: 16,
+  resTotal: {
+    fontSize: 20,
     fontWeight: '900',
-    fontFamily: 'monospace',
+    color: '#15803D',
   },
 });

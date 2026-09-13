@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAnveshana } from '../context/AnveshanaContext';
-import { Smartphone, Tablet, Monitor, Building2, QrCode, Wifi, WifiOff, Zap, Sliders, Lock, CheckCircle2, LogOut, User, ArrowLeft, Home } from 'lucide-react';
+import { Smartphone, Tablet, Monitor, Building2, QrCode, Wifi, WifiOff, Zap, Sliders, Lock, CheckCircle2, LogOut, User, Home, Accessibility, Sun, Moon, Type, Plus, Globe } from 'lucide-react';
 
 export default function HeaderNav({ onBackToHome }) {
   const {
@@ -10,11 +10,16 @@ export default function HeaderNav({ onBackToHome }) {
     logoutRole,
     language,
     setLanguage,
+    theme,
+    setTheme,
+    fontScale,
+    setFontScale,
     isOnline,
     setIsOnline,
     injectVolumeAnomalySimulation,
     addPourEvent
   } = useAnveshana();
+  const [showAccessibility, setShowAccessibility] = useState(false);
 
   const activeSession = authenticatedSessions[currentRole];
 
@@ -125,7 +130,7 @@ export default function HeaderNav({ onBackToHome }) {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-950/60 hover:bg-teal-900/60 text-teal-300 text-xs font-bold transition-all shadow-md"
             title="Toggle Language / भाषा बदलें"
           >
-            <span className="text-base">🌐</span>
+            <Globe className="h-4 w-4" />
             <span>{language === 'EN' ? 'EN' : 'हिंदी'}</span>
           </button>
 
@@ -141,6 +146,42 @@ export default function HeaderNav({ onBackToHome }) {
               {isOnline ? (isHindi ? 'ऑनलाइन' : 'ONLINE') : (isHindi ? 'ऑफ़लाइन मोड' : 'OFFLINE MODE')}
             </span>
           </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowAccessibility(!showAccessibility)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:text-emerald-700 text-xs font-bold transition-all"
+              title="Accessibility settings"
+              aria-expanded={showAccessibility}
+              aria-controls="accessibility-settings"
+            >
+              <Accessibility className="w-4 h-4" />
+              <span className="hidden sm:inline">ACCESSIBILITY</span>
+            </button>
+            {showAccessibility && (
+              <div id="accessibility-settings" className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm font-bold">Accessibility</span>
+                  <Accessibility className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold">Theme</span>
+                  <div className="flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label="Theme">
+                    <button onClick={() => setTheme('light')} className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs ${theme === 'light' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`} aria-label="Light theme"><Sun className="h-3.5 w-3.5" /> Light</button>
+                    <button onClick={() => setTheme('dark')} className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs ${theme === 'dark' ? 'bg-slate-800 text-white' : 'text-slate-600'}`} aria-label="Dark theme"><Moon className="h-3.5 w-3.5" /> Dark</button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1 text-xs font-semibold"><Type className="h-3.5 w-3.5" /> Text size</span>
+                  <div className="flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label="Text size">
+                    <button onClick={() => setFontScale('normal')} className={`rounded-md px-2 py-1 text-xs ${fontScale === 'normal' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`} aria-label="Normal text size">A</button>
+                    <button onClick={() => setFontScale('large')} className={`rounded-md px-2 py-1 text-sm ${fontScale === 'large' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`} aria-label="Large text size"><Plus className="h-3 w-3" /></button>
+                    <button onClick={() => setFontScale('x-large')} className={`rounded-md px-2 py-1 text-base ${fontScale === 'x-large' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`} aria-label="Extra large text size"><Plus className="h-3.5 w-3.5" /><Plus className="-ml-1.5 h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

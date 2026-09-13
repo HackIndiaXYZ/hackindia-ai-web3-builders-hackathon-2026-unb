@@ -22,6 +22,9 @@ import {
   Zap,
   Check,
   Filter
+  ,Sprout
+  ,Snowflake
+  ,Factory
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -82,10 +85,10 @@ export default function ConsumerPassport() {
           adulterants: isHindi ? "0.0% (शून्य रसायन)" : "0.0% (Zero Adulterants)"
         },
         nodesTrail: [
-          { id: "VLC-TN-11", name: isHindi ? "पोलैची गांव संग्रह केंद्र" : "Pollachi Village AMCU #11", location: "Pollachi, Coimbatore", type: "Farm Gate AMCU", time: "05:30 AM", status: "COMPLETED", icon: "🌿", detail: "35 Farmers • 9.2 kg avg pour • NDLM Tag" },
-          { id: "MCC-TN-88", name: isHindi ? "कोयंबटूर दुग्ध शीतलन केंद्र" : "Coimbatore Milk Chilling Hub", location: "Coimbatore, Tamil Nadu", type: "Cold-Chain Chilling (3.6°C)", time: "07:45 AM", status: "COMPLETED", icon: "❄️", detail: "Thermal Probe Lock • 3.6°C Constant" },
-          { id: "FACTORY-TN-02", name: isHindi ? "चेन्नई डेयरी प्रसंस्करण संयंत्र" : "Chennai Dairy Processing Plant", location: "Ambattur, Chennai", type: "Mass Balance & Pouch Packing", time: "01:15 PM", status: "COMPLETED", icon: "🏭", detail: "Delta +0.1% ≤ 1.0% • Sealed Hash" },
-          { id: "CONSUMER", name: isHindi ? "आपका दूध पाउच (स्कैन किया गया)" : "Your Milk Pouch (Scanned)", location: "Consumer Point of Sale", time: "05:00 PM", status: "VERIFIED", icon: "🥛", detail: "100% On-Chain Purity Guaranteed" }
+          { id: "VLC-TN-11", name: isHindi ? "पोलैची गांव संग्रह केंद्र" : "Pollachi Village AMCU #11", location: "Pollachi, Coimbatore", type: "Farm Gate AMCU", time: "05:30 AM", status: "COMPLETED", icon: "sprout", detail: "35 Farmers • 9.2 kg avg pour • NDLM Tag" },
+          { id: "MCC-TN-88", name: isHindi ? "कोयंबटूर दुग्ध शीतलन केंद्र" : "Coimbatore Milk Chilling Hub", location: "Coimbatore, Tamil Nadu", type: "Cold-Chain Chilling (3.6°C)", time: "07:45 AM", status: "COMPLETED", icon: "cold", detail: "Thermal Probe Lock • 3.6°C Constant" },
+          { id: "FACTORY-TN-02", name: isHindi ? "चेन्नई डेयरी प्रसंस्करण संयंत्र" : "Chennai Dairy Processing Plant", location: "Ambattur, Chennai", type: "Mass Balance & Pouch Packing", time: "01:15 PM", status: "COMPLETED", icon: "factory", detail: "Delta +0.1% ≤ 1.0% • Sealed Hash" },
+          { id: "CONSUMER", name: isHindi ? "आपका दूध पाउच (स्कैन किया गया)" : "Your Milk Pouch (Scanned)", location: "Consumer Point of Sale", time: "05:00 PM", status: "VERIFIED", icon: "milk", detail: "100% On-Chain Purity Guaranteed" }
         ]
       };
     }
@@ -114,10 +117,10 @@ export default function ConsumerPassport() {
         adulterants: isHindi ? "0.0% (शून्य यूरा/डिटर्जेंट)" : "0.0% (Zero Urea/Detergent)"
       },
       nodesTrail: [
-        { id: "VLC-22", name: isHindi ? "निसिंग गांव संग्रह केंद्र" : "Nissing Village AMCU #22", location: "Nissing Block, Karnal", type: "Farm Gate AMCU Collection", time: "06:15 AM", status: "COMPLETED", icon: "🌿", detail: "22 Farmers • 8.5 kg avg pour • NDLM Tag" },
-        { id: "MCC-104", name: isHindi ? "करनाल दुग्ध शीतलन केंद्र" : "Karnal Milk Chilling Center Gate #4", location: "Karnal GT Road, Haryana", type: "Cold-Chain Chilling (3.8°C)", time: "08:45 AM", status: "COMPLETED", icon: "❄️", detail: "Thermal Probe Lock • 3.8°C Constant" },
-        { id: "FACTORY-DL-01", name: isHindi ? "पटपड़गंज प्रसंस्करण एवं पैकेजिंग संयंत्र" : "Patparganj Dairy Processing Plant", location: "Delhi NCR Industrial Hub", type: "Mass Balance & Pouch Packing", time: "02:30 PM", status: "COMPLETED", icon: "🏭", detail: "Delta +0.2% ≤ 1.0% • Sealed Hash" },
-        { id: "CONSUMER", name: isHindi ? "आपका दूध पाउच (स्कैन किया गया)" : "Your Milk Pouch (Scanned)", location: "Consumer Point of Sale", time: "06:30 PM", status: "VERIFIED", icon: "🥛", detail: "100% On-Chain Purity Guaranteed" }
+        { id: "VLC-22", name: isHindi ? "निसिंग गांव संग्रह केंद्र" : "Nissing Village AMCU #22", location: "Nissing Block, Karnal", type: "Farm Gate AMCU Collection", time: "06:15 AM", status: "COMPLETED", icon: "sprout", detail: "22 Farmers • 8.5 kg avg pour • NDLM Tag" },
+        { id: "MCC-104", name: isHindi ? "करनाल दुग्ध शीतलन केंद्र" : "Karnal Milk Chilling Center Gate #4", location: "Karnal GT Road, Haryana", type: "Cold-Chain Chilling (3.8°C)", time: "08:45 AM", status: "COMPLETED", icon: "cold", detail: "Thermal Probe Lock • 3.8°C Constant" },
+        { id: "FACTORY-DL-01", name: isHindi ? "पटपड़गंज प्रसंस्करण एवं पैकेजिंग संयंत्र" : "Patparganj Dairy Processing Plant", location: "Delhi NCR Industrial Hub", type: "Mass Balance & Pouch Packing", time: "02:30 PM", status: "COMPLETED", icon: "factory", detail: "Delta +0.2% ≤ 1.0% • Sealed Hash" },
+        { id: "CONSUMER", name: isHindi ? "आपका दूध पाउच (स्कैन किया गया)" : "Your Milk Pouch (Scanned)", location: "Consumer Point of Sale", time: "06:30 PM", status: "VERIFIED", icon: "milk", detail: "100% On-Chain Purity Guaranteed" }
       ]
     };
   }, [activeBatchId, isHindi]);
@@ -194,7 +197,7 @@ export default function ConsumerPassport() {
             className="px-5 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg flex items-center justify-center gap-2 shrink-0 transition-all transform hover:scale-[1.02]"
           >
             <Camera className="w-4 h-4 text-slate-950 animate-pulse" />
-            <span>{isHindi ? '📷 कैमरे से क्यूआर कोड स्कैन करें' : '📷 SCAN QR CODE WITH CAMERA'}</span>
+            <span>{isHindi ? 'कैमरे से क्यूआर कोड स्कैन करें' : 'SCAN QR CODE WITH CAMERA'}</span>
           </button>
         </div>
 
@@ -250,7 +253,7 @@ export default function ConsumerPassport() {
           <div className="bg-emerald-950/60 px-4 py-2.5 rounded-xl border border-emerald-500/30 text-right">
             <div className="text-[10px] text-emerald-300 uppercase tracking-wider font-mono">Status</div>
             <div className="text-xs font-bold text-white uppercase tracking-wider">
-              {isHindi ? '🟢 100% शुद्ध प्रमाणित' : '🟢 VERIFIED PURE'}
+              {isHindi ? '100% शुद्ध प्रमाणित' : 'VERIFIED PURE'}
             </div>
           </div>
         </div>
@@ -269,7 +272,7 @@ export default function ConsumerPassport() {
             <div className="flex items-center justify-between border-b border-emerald-500/30 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 text-xl font-bold">
-                  🥛
+                  <Milk className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="text-xs font-bold text-white uppercase">{currentPassport.brandName}</div>
@@ -400,7 +403,10 @@ export default function ConsumerPassport() {
                 >
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl shrink-0">
-                      {node.icon}
+                      {node.icon === 'sprout' && <Sprout className="h-6 w-6 text-emerald-400" />}
+                      {node.icon === 'cold' && <Snowflake className="h-6 w-6 text-cyan-400" />}
+                      {node.icon === 'factory' && <Factory className="h-6 w-6 text-amber-400" />}
+                      {node.icon === 'milk' && <Milk className="h-6 w-6 text-emerald-400" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -410,9 +416,9 @@ export default function ConsumerPassport() {
                         <span className="text-xs font-bold text-white">{node.name}</span>
                       </div>
                       <div className="text-xs text-slate-400 mt-1 flex items-center gap-3 font-sans">
-                        <span>📍 {node.location}</span>
+                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {node.location}</span>
                         <span>•</span>
-                        <span className="text-slate-300 font-mono">🕒 {node.time}</span>
+                        <span className="flex items-center gap-1 text-slate-300 font-mono"><Clock className="h-3.5 w-3.5" /> {node.time}</span>
                       </div>
                       <div className="text-xs text-emerald-300/90 font-mono mt-1">
                         {node.detail}
@@ -609,7 +615,7 @@ export default function ConsumerPassport() {
               {verifyStep >= 4 && (
                 <div className="space-y-3 text-center py-2">
                   <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
-                    👑
+                    <Award className="h-6 w-6" />
                   </div>
                   <div className="text-emerald-400 font-extrabold text-xs">{isHindi ? '100% शुद्ध जैविक दुग्ध प्रमाणित!' : '100% Pure Organic Milk Certified!'}</div>
                   <div className="text-slate-300 text-[10px] font-sans">

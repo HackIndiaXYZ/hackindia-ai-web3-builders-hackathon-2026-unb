@@ -1,172 +1,309 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  Alert
+  ScrollView
 } from 'react-native';
 
-export default function CattleScreen({ language }) {
-  const isHindi = language === 'HI';
-
-  const [cattleList] = useState([
-    { id: '1', breed: 'Murrah Buffalo (मुर्रा भैंस)', tag: '840003129940112', dailyYield: '12.5 L/day', status: 'HEALTHY', vaccine: 'FMD Verified', icon: '🐂' },
-    { id: '2', breed: 'Sahiwal Cow (साहीवाल गाय)', tag: '840003129940113', dailyYield: '9.0 L/day', status: 'HEALTHY', vaccine: 'HS Booster Done', icon: '🐄' },
-    { id: '3', breed: 'Gir Cow (गीर गाय)', tag: '840003129940114', dailyYield: '10.2 L/day', status: 'HEALTHY', vaccine: 'Brucellosis Clear', icon: '🐄' },
-    { id: '4', breed: 'Murrah Buffalo (मुर्रा भैंस #2)', tag: '840003129940115', dailyYield: '11.8 L/day', status: 'HEALTHY', vaccine: 'FMD Verified', icon: '🐂' }
-  ]);
+export default function CattleScreen({ language, cattleList, onAddCattle }) {
+  const { t } = useTranslation(language);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>
-            {isHindi ? 'पंजीकृत पशुधन व NDLM टैग' : 'Registered Cattle & NDLM Tags'}
-          </Text>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => Alert.alert('Register NDLM Tag', 'Scan or enter 15-digit ear tag number to pair with cattle.')}
-          >
-            <Text style={styles.addBtnText}>{isHindi ? '+ नया टैग' : '+ Add Tag'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      {/* Header */}
+      <View style={styles.headerCard}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>
+              {t('registeredCattle')}
+            </Text>
+            <Text style={styles.sub}>
+              {cattleList.length} {t('animalsLinked')}
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.addBtn} onPress={onAddCattle} activeOpacity={0.85}>
+            <Text style={styles.addBtnText}>{t('addCattle')}</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {cattleList.map((item) => (
-          <View key={item.id} style={styles.cattleCard}>
-            <View style={styles.leftCol}>
-              <View style={styles.iconCircle}>
-                <Text style={styles.iconText}>{item.icon}</Text>
-              </View>
-              <View>
-                <Text style={styles.breedText}>{item.breed}</Text>
-                <Text style={styles.tagText}>NDLM: #{item.tag}</Text>
-                <View style={styles.subRow}>
-                  <View style={styles.vacBadge}>
-                    <Text style={styles.vacText}>{item.vaccine}</Text>
-                  </View>
-                  <Text style={styles.yieldText}>• {item.dailyYield}</Text>
-                </View>
-              </View>
+      {/* Cattle List */}
+      {cattleList.map((item) => (
+        <View key={item.id} style={styles.cattleCard}>
+          <View style={styles.leftBox}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>NDLM</Text>
             </View>
-
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>{item.status}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.breedName}>{item.breed}</Text>
+              <Text style={styles.tagText}>टैग संख्या: #{item.tag}</Text>
+              
+              <View style={styles.badgeRow}>
+                <View style={styles.vacBadge}>
+                  <Text style={styles.vacBadgeText}>{item.vaccine}</Text>
+                </View>
+                <Text style={styles.yieldText}>दूध: {item.dailyYield}</Text>
+              </View>
+              <Text style={styles.verificationText}>NDLM: {item.verificationStatus || 'ACTIVE'}</Text>
             </View>
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+
+          <View style={styles.statusPill}>
+            <Text style={styles.statusPillText}>{item.status}</Text>
+          </View>
+        </View>
+      ))}
+
+      {/* Government NDLM Info Box */}
+      <View style={styles.infoCard}>
+        <Text style={styles.infoIcon}>NDLM</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.infoTitle}>
+            {t('ndlmTitle')}
+          </Text>
+          <Text style={styles.infoDesc}>
+            {t('ndlmDesc')}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.processCard}>
+        <Text style={styles.sectionTitle}>{t('ndlmProcessTitle')}</Text>
+        {[
+          t('ndlmStep1'),
+          t('ndlmStep2'),
+          t('ndlmStep3'),
+          t('ndlmStep4')
+        ].map((step, index) => <View key={step} style={styles.processRow}><View style={styles.stepNumber}><Text style={styles.stepNumberText}>{index + 1}</Text></View><Text style={styles.processText}>{step}</Text></View>)}
+        <Text style={styles.helpText}>{t('helpContact')}</Text>
+      </View>
+
+      <View style={styles.processCard}>
+        <Text style={styles.sectionTitle}>{t('servicesUnlocked')}</Text>
+        <View style={styles.serviceGrid}>
+          {['Animal health history', 'Vaccination reminders', 'Breeding and calving', 'Insurance readiness', 'KCC documentation', 'Livestock schemes'].map((service) => <Text key={service} style={styles.serviceItem}>{service}</Text>)}
+        </View>
+      </View>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 24,
+    gap: 12,
   },
-  headerRow: {
+  headerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 1,
+  },
+  headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    alignItems: 'center',
   },
   title: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
+    color: '#0F172A',
+  },
+  sub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   addBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#15803D',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
   },
   addBtnText: {
-    color: '#022c22',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
   },
   cattleCard: {
-    backgroundColor: '#090d1a',
-    borderColor: '#1e293b',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     borderWidth: 1,
-    borderRadius: 18,
+    borderColor: '#E2E8F0',
     padding: 14,
-    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    elevation: 1,
+    gap: 10,
   },
-  leftCol: {
+  leftBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1e293b',
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
-  iconText: {
-    fontSize: 22,
-  },
-  breedText: {
-    color: '#ffffff',
-    fontSize: 13,
+  avatarText: {
+    fontSize: 10,
     fontWeight: '800',
+    color: '#15803D',
+  },
+  breedName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   tagText: {
-    color: '#34d399',
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#475569',
     marginTop: 2,
   },
-  subRow: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 4,
   },
   vacBadge: {
-    backgroundColor: '#022c22',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderWidth: 1,
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  vacText: {
-    color: '#34d399',
+  vacBadgeText: {
     fontSize: 9,
     fontWeight: '700',
+    color: '#15803D',
   },
   yieldText: {
-    color: '#94a3b8',
     fontSize: 10,
+    color: '#64748B',
   },
-  statusBadge: {
-    backgroundColor: '#0f172a',
-    borderColor: '#334155',
-    borderWidth: 1,
+  verificationText: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  statusPill: {
+    backgroundColor: '#F0FDF4',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
-  statusText: {
-    color: '#34d399',
+  statusPillText: {
+    color: '#15803D',
     fontSize: 10,
     fontWeight: '700',
+  },
+  infoCard: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  infoIcon: {
+    fontSize: 22,
+    marginTop: 2,
+  },
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  infoDesc: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  processCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  processRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  stepNumber: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumberText: {
+    color: '#15803D',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  processText: {
+    flex: 1,
+    color: '#475569',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  helpText: {
+    color: '#64748B',
+    fontSize: 10,
+    lineHeight: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
+  },
+  serviceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  serviceItem: {
+    width: '47%',
+    color: '#475569',
+    fontSize: 11,
+    lineHeight: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: '#16A34A',
+    paddingLeft: 6,
   },
 });

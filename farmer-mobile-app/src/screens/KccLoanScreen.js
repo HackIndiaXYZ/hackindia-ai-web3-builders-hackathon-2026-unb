@@ -1,161 +1,227 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  Alert
+  ScrollView
 } from 'react-native';
 
-export default function KccLoanScreen({ language }) {
-  const isHindi = language === 'HI';
-  const [approved, setApproved] = useState(false);
-
-  const handleApply = () => {
-    setApproved(true);
-    Alert.alert(
-      'NABARD Loan Approved!',
-      '₹1,60,000 pre-approved credit sanctioned and disbursed to your SBI account **4012 based on Anveshana Purity Score 87.'
-    );
-  };
+export default function KccLoanScreen({ language, approved, onApply }) {
+  const { t } = useTranslation(language);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <Text style={styles.icon}>🏛️</Text>
-          <Text style={styles.title}>
-            {isHindi ? 'नाबार्ड इंस्टेंट KCC लोन' : 'NABARD Instant KCC Loan'}
-          </Text>
-          <Text style={styles.sub}>
-            {isHindi ? 'अन्वेषण शुद्धता स्कोर 87 के आधार पर पूर्व-स्वीकृत' : 'Pre-approved based on Anveshana Purity Score 87.'}
-          </Text>
-
-          <View style={styles.box}>
-            <View style={styles.row}>
-              <Text style={styles.label}>Approved Limit:</Text>
-              <Text style={styles.valGreen}>₹1,60,000</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Interest Subvention:</Text>
-              <Text style={styles.valWhite}>4.0% p.a.</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Security Guarantee:</Text>
-              <Text style={styles.valGreen}>FSSAI Hardware Lock</Text>
-            </View>
-          </View>
-
-          {approved ? (
-            <View style={styles.approvedBox}>
-              <Text style={styles.approvedTitle}>✅ LOAN SANCTIONED</Text>
-              <Text style={styles.approvedText}>₹1,60,000 Credited to SBI Account **4012</Text>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-              <Text style={styles.applyText}>
-                {isHindi ? 'स्वीकृत करें और ऋण प्राप्त करें' : 'Confirm & Sanction Loan'}
-              </Text>
-            </TouchableOpacity>
-          )}
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      {/* Main Loan Banner */}
+      <View style={styles.mainCard}>
+        <View style={styles.iconCircle}>
+          <Text style={styles.iconEmoji}>🏛️</Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        <Text style={styles.title}>
+          {t('nabardKccTitle')}
+        </Text>
+        <Text style={styles.sub}>
+          {t('kccPreApprovedSub')}
+        </Text>
+
+        {/* Breakdown Box */}
+        <View style={styles.detailsBox}>
+          <View style={styles.row}>
+            <Text style={styles.label}>{t('approvedLimit')}</Text>
+            <Text style={styles.valGreen}>₹1,60,000</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>{t('interestRate')}</Text>
+            <Text style={styles.valDark}>{t('interestRateVal')}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>{t('bankAccount')}</Text>
+            <Text style={styles.valDark}>SBI **4012 (Ramesh Kumar)</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>{t('collateral')}</Text>
+            <Text style={styles.valGreen}>{t('collateralVal')}</Text>
+          </View>
+        </View>
+
+        {approved ? (
+          <View style={styles.approvedCard}>
+            <Text style={styles.approvedTitle}>
+              {t('loanSanctioned')}
+            </Text>
+            <Text style={styles.approvedSub}>
+              {t('loanSanctionedDesc')}
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.applyButton} onPress={onApply} activeOpacity={0.85}>
+            <Text style={styles.applyButtonText}>
+              {t('sanctionLoan')}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Highlights */}
+      <View style={styles.highlightsGrid}>
+        <View style={styles.highlightCard}>
+          <Text style={styles.hlIcon}>📝</Text>
+          <Text style={styles.hlTitle}>{t('noPaperwork')}</Text>
+          <Text style={styles.hlDesc}>
+            {t('noPaperworkDesc')}
+          </Text>
+        </View>
+
+        <View style={styles.highlightCard}>
+          <Text style={styles.hlIcon}>🌾</Text>
+          <Text style={styles.hlTitle}>{t('lowInterest')}</Text>
+          <Text style={styles.hlDesc}>
+            {t('lowInterestDesc')}
+          </Text>
+        </View>
+      </View>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 24,
+    gap: 12,
   },
-  card: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+  mainCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     borderWidth: 1,
-    borderRadius: 22,
+    borderColor: '#E2E8F0',
     padding: 20,
     alignItems: 'center',
+    gap: 10,
+    elevation: 1,
   },
-  icon: {
-    fontSize: 44,
-    marginBottom: 10,
+  iconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconEmoji: {
+    fontSize: 26,
   },
   title: {
-    color: '#ffffff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
+    color: '#0F172A',
     textAlign: 'center',
   },
   sub: {
-    color: '#94a3b8',
     fontSize: 12,
+    color: '#64748B',
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 16,
+    lineHeight: 16,
+    paddingHorizontal: 8,
   },
-  box: {
+  detailsBox: {
     width: '100%',
-    backgroundColor: '#090d1a',
-    borderColor: '#1e293b',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 16,
+    borderColor: '#E2E8F0',
     padding: 14,
     gap: 10,
-    marginBottom: 16,
+    marginVertical: 6,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
-    color: '#94a3b8',
     fontSize: 12,
+    color: '#64748B',
   },
   valGreen: {
-    color: '#34d399',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
+    color: '#15803D',
   },
-  valWhite: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
+  valDark: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  applyBtn: {
+  applyButton: {
     width: '100%',
-    backgroundColor: '#10b981',
+    backgroundColor: '#15803D',
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
+    marginTop: 4,
   },
-  applyText: {
-    color: '#022c22',
-    fontSize: 13,
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '800',
   },
-  approvedBox: {
+  approvedCard: {
     width: '100%',
-    backgroundColor: '#022c22',
-    borderColor: '#10b981',
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 12,
     padding: 14,
-    borderRadius: 14,
     alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
   },
   approvedTitle: {
-    color: '#34d399',
+    color: '#15803D',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
-  approvedText: {
-    color: '#ffffff',
+  approvedSub: {
+    color: '#475569',
     fontSize: 11,
-    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  highlightsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  highlightCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    gap: 4,
+    elevation: 1,
+  },
+  hlIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  hlTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  hlDesc: {
+    fontSize: 10,
+    color: '#64748B',
+    lineHeight: 14,
   },
 });
