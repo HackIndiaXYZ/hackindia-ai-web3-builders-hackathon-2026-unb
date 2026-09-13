@@ -245,11 +245,37 @@ export function aggregateRisk({ level = 'district', state, district, village, fa
 
 export function seedRiskDemo({ emit } = {}) {
   if (store.riskObservations.length) return { seeded: false, count: store.riskAnomalies.length };
-  const demo = [
-    { farmerId: '201410000128', farmerName: 'Balwant Yadav', animalId: 'NDLM-840003129940117', breed: 'Murrah Buffalo', village: 'Siwan', district: 'Kaithal', state: 'Haryana', nodeId: 'VLC-KTL-02', purityScore: 76, fatPercent: 3.2, snfPercent: 7.1, weightKg: 9.4, tankerRegistration: 'HR-07-GA-5541', chillingCenterId: 'MCC-KTL-01', source: 'DEMO_SEED' },
-    { farmerId: '201410000123', farmerName: 'Ramesh Kumar', animalId: 'NDLM-840003129940112', breed: 'Murrah Buffalo', village: 'Karnal', district: 'Karnal', state: 'Haryana', nodeId: 'VLC-KNL-01', purityScore: 87, fatPercent: 4.2, snfPercent: 8.7, weightKg: 8.5, tankerRegistration: 'HR-07-GA-5541', chillingCenterId: 'MCC-KTL-01', source: 'DEMO_SEED' },
-    { farmerId: '201410000128', farmerName: 'Balwant Yadav', animalId: 'NDLM-840003129940117', breed: 'Murrah Buffalo', village: 'Siwan', district: 'Kaithal', state: 'Haryana', nodeId: 'VLC-KTL-02', purityScore: 76, fatPercent: 3.0, snfPercent: 7.0, weightKg: 9.2, tankerRegistration: 'HR-07-GA-5541', chillingCenterId: 'MCC-KTL-01', source: 'DEMO_SEED' }
+  const demoFarmers = [
+    ['201410000128', 'Balwant Yadav', 'NDLM-840003129940117', 'Murrah Buffalo', 'Siwan', 'Kaithal', 'VLC-KTL-02', 'HR-07-GA-5541', 'MCC-KTL-01'],
+    ['201410000123', 'Ramesh Kumar', 'NDLM-840003129940112', 'Murrah Buffalo', 'Nissing', 'Karnal', 'VLC-KNL-01', 'HR-08-B-9912', 'MCC-KNL-01'],
+    ['201410000130', 'Dharambir Saini', 'NDLM-840003129940119', 'Murrah Buffalo', 'Adampur', 'Hisar', 'VLC-HSR-01', 'HR-09-C-1122', 'MCC-HSR-01'],
+    ['201410000133', 'Mahesh Tyagi', 'NDLM-840003129940122', 'HF Cross', 'Gohana', 'Sonepat', 'VLC-SNP-01', 'HR-10-AA-4412', 'MCC-SNP-01'],
+    ['201410000136', 'Omkar Bishnoi', 'NDLM-840003129940125', 'Tharparkar', 'Sirsa', 'Sirsa', 'VLC-SRS-01', 'HR-11-BC-7720', 'MCC-SRS-01'],
+    ['201410000140', 'Rajpal Siwach', 'NDLM-840003129940129', 'Gir Cow', 'Fatehabad', 'Fatehabad', 'VLC-FTB-01', 'HR-12-DE-3301', 'MCC-FTB-01']
   ];
+  const demo = Array.from({ length: 96 }, (_, index) => {
+    const farmer = demoFarmers[index % demoFarmers.length];
+    const flagged = index % 19 === 0 || index % 31 === 0;
+    const normalFat = farmer[3] === 'Murrah Buffalo' ? 6.4 : 4.5;
+    return {
+      farmerId: farmer[0],
+      farmerName: farmer[1],
+      animalId: farmer[2],
+      breed: farmer[3],
+      village: farmer[4],
+      district: farmer[5],
+      state: 'Haryana',
+      nodeId: farmer[6],
+      purityScore: flagged ? 72 + (index % 7) : 86 + (index % 12),
+      fatPercent: +(flagged ? normalFat - 2.1 : normalFat + ((index % 5) - 2) * 0.18).toFixed(1),
+      snfPercent: +(flagged ? 7.1 : 8.7 + ((index % 4) - 1) * 0.12).toFixed(1),
+      weightKg: +(flagged ? 18.5 + (index % 4) : 6.5 + (index % 9) * 0.8).toFixed(1),
+      tankerRegistration: farmer[7],
+      chillingCenterId: farmer[8],
+      source: 'DEMO_SEED',
+      observedAt: new Date(Date.UTC(2026, 8, 13, 4 + (index % 8), index % 60)).toISOString()
+    };
+  });
   const results = demo.map(item => ingestRiskObservation(item, { emit }));
   return { seeded: true, count: results.length, anomalies: results.map(item => item.anomaly) };
 }

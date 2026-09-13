@@ -4,7 +4,8 @@ import {
   Shield, ShieldAlert, MapPin, Radio, Send, FileText, CheckCircle2,
   Navigation, Globe, TrendingUp, BarChart2, ClipboardList, Database,
   Download, AlertTriangle, Activity, Zap, ChevronDown, RefreshCw,
-  Lock, UserCheck, Eye, Filter, Landmark, Target, ClipboardCheck, Camera, Navigation2, Clock
+  Lock, UserCheck, Eye, Filter, Landmark, Target, ClipboardCheck, Camera, Navigation2, Clock,
+  Maximize2, Minimize2, Thermometer, Users, Beef, CloudSun, Search, ExternalLink
 } from 'lucide-react';
 import L from 'leaflet';
 
@@ -128,6 +129,180 @@ function Sparkline({ data, color = '#f59e0b' }) {
       <polygon points={area} fill="url(#sparkGrad)" />
       <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" />
     </svg>
+  );
+}
+
+function RegionInspector({
+  selectedRegion,
+  stats,
+  weather,
+  officers,
+  selectedOfficerId,
+  setSelectedOfficerId,
+  selectedFarmId,
+  setSelectedFarmId,
+  onAssign,
+  onOpenRisk,
+  onUpdateAssignment,
+  onFlagEntity
+}) {
+  const [query, setQuery] = useState('');
+  if (!selectedRegion || !stats) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-center text-xs text-slate-500">
+        <MapPin className="mx-auto mb-2 h-8 w-8 text-slate-700" />
+        Select a district or collection village on the map to inspect its live register.
+      </div>
+    );
+  }
+
+  const selectedFarm = stats.highRiskFarms.find(item => item.farmId === selectedFarmId) || stats.highRiskFarms[0];
+  const targetAssignment = selectedFarm
+    ? stats.assignments.find(item => item.targetId === selectedFarm.farmId)
+    : stats.assignments.find(item => item.targetId === stats.node?.nodeId);
+  const filteredFarmers = stats.farmers.filter(item => (
+    !query.trim() || `${item.name} ${item.farmerId}`.toLowerCase().includes(query.trim().toLowerCase())
+  ));
+  const cattleResults = stats.farmers.flatMap(farmer => Array.from({ length: farmer.registeredCows || 0 }, (_, index) => ({
+    cattleId: `${farmer.ndlmTag}-${String(index + 1).padStart(2, '0')}`,
+    breed: farmer.animalBreed,
+    farmer
+  }))).filter(item => !query.trim() || `${item.cattleId} ${item.breed} ${item.farmer.name}`.toLowerCase().includes(query.trim().toLowerCase()));
+
+  return (
+    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-4">
+      <div className="border-b border-slate-800 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+              {selectedRegion.kind === 'village' ? 'Village / collection point' : 'District command view'}
+            </div>
+            <h3 className="mt-1 text-base font-bold text-white">{selectedRegion.name}</h3>
+            <p className="mt-1 text-[11px] text-slate-500">{stats.district}{stats.node ? ` · ${stats.node.type}` : ''}</p>
+          </div>
+          <span className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[10px] font-mono text-sky-300">
+            {weather.temp}°C · {weather.condition}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-slate-900 p-2"><Users className="mb-1 h-3.5 w-3.5 text-emerald-400" /><b className="text-sm text-white">{stats.farmerCount}</b><span className="block text-[9px] text-slate-500">farmers</span></div>
+          <div className="rounded-lg bg-slate-900 p-2"><Beef className="mb-1 h-3.5 w-3.5 text-amber-400" /><b className="text-sm text-white">{stats.cattleCount}</b><span className="block text-[9px] text-slate-500">cattle</span></div>
+          <div className="rounded-lg bg-slate-900 p-2"><ShieldAlert className="mb-1 h-3.5 w-3.5 text-rose-400" /><b className="text-sm text-white">{stats.anomalyCount}</b><span className="block text-[9px] text-slate-500">risk signals</span></div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+          <span><Thermometer className="mr-1 inline h-3 w-3 text-orange-300" />Humidity {weather.humidity}%</span>
+          <span><CloudSun className="mr-1 inline h-3 w-3 text-sky-300" />{weather.wind} km/h wind</span>
+          <span className="text-slate-600">Prototype weather context</span>
+        </div>
+          {stats.node && (
+            <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-[10px]">
+              <div><span className="block text-slate-600">Operator</span><b className="text-slate-300">{stats.node.operator}</b></div>
+              <div><span className="block text-slate-600">Connectivity</span><b className={stats.node.connectivity === 'ONLINE' ? 'text-emerald-300' : 'text-amber-300'}>{stats.node.connectivity}</b></div>
+              <div><span className="block text-slate-600">Daily intake</span><b className="text-sky-300">{stats.node.dailyVolumeLitres.toLocaleString()} L</b></div>
+              <div><span className="block text-slate-600">Cold storage</span><b className="text-slate-300">{stats.node.storageCapacityLitres.toLocaleString()} L</b></div>
+            </div>
+          )}
+        </div>
+
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-600" />
+        <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search farmer ID, name or cattle ID" className="w-full rounded-lg border border-slate-800 bg-slate-900 py-1.5 pl-8 pr-2 text-[11px] text-white placeholder:text-slate-600 focus:border-amber-400 focus:outline-none" />
+      </div>
+
+      {query.trim() && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+          <div className="flex items-center justify-between"><h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-300">Register search results</h4><span className="text-[9px] text-slate-500">{filteredFarmers.length + cattleResults.length} matches</span></div>
+          <div className="mt-2 space-y-2">
+            {filteredFarmers.slice(0, 5).map(farmer => (
+              <div key={farmer.farmerId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950 p-2">
+                <div><div className="text-[11px] font-bold text-white">{farmer.name}</div><div className="text-[9px] font-mono text-slate-500">FARMER · {farmer.farmerId} · {farmer.registeredCows} cattle</div></div>
+                <button onClick={() => onFlagEntity({ entityType: 'FARMER', entityId: farmer.farmerId, farmer, nodeId: farmer.nodeId, district: farmer.district })} className="rounded border border-rose-500/40 px-2 py-1 text-[9px] font-bold text-rose-300 hover:bg-rose-500/10">Flag farmer</button>
+              </div>
+            ))}
+            {cattleResults.slice(0, 8).map(item => (
+              <div key={item.cattleId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950 p-2">
+                <div><div className="text-[11px] font-bold text-white">{item.cattleId}</div><div className="text-[9px] text-slate-500">CATTLE · {item.breed} · {item.farmer.name}</div></div>
+                <button onClick={() => onFlagEntity({ entityType: 'CATTLE', entityId: item.cattleId, farmer: item.farmer, nodeId: item.farmer.nodeId, district: item.farmer.district })} className="rounded border border-rose-500/40 px-2 py-1 text-[9px] font-bold text-rose-300 hover:bg-rose-500/10">Flag cattle</button>
+              </div>
+            ))}
+            {!filteredFarmers.length && !cattleResults.length && <p className="text-[10px] text-slate-500">No farmer or cattle record matches this ID.</p>}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-rose-300">High-risk farms</h4>
+          <span className="font-mono text-[10px] text-rose-300">{stats.highRiskFarms.length}</span>
+        </div>
+        {stats.highRiskFarms.length === 0 ? <p className="mt-2 text-[10px] text-slate-500">No high-risk farm currently mapped in this region.</p> : (
+          <div className="mt-2 space-y-2">
+            {stats.highRiskFarms.map(item => (
+              <button key={item.farmId} onClick={() => setSelectedFarmId(item.farmId)} className={`w-full rounded-lg border p-2 text-left transition ${selectedFarm?.farmId === item.farmId ? 'border-rose-400 bg-rose-500/15' : 'border-slate-800 bg-slate-950 hover:border-rose-500/50'}`}>
+                <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-bold text-white">{item.farmer?.name || item.farmId}</span><span className="font-mono text-[10px] text-rose-300">{item.riskScore}/100</span></div>
+                <div className="mt-1 text-[10px] text-slate-500">{item.type} · {item.status}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Direct officer dispatch</h4>
+          {targetAssignment && <span className="text-[9px] font-mono text-sky-300">{targetAssignment.status}</span>}
+        </div>
+        <p className="mt-1 text-[10px] text-slate-500">{selectedFarm ? `Target: ${selectedFarm.farmId}` : 'Target: selected collection point'}</p>
+        <div className="mt-2 flex gap-2">
+          <select value={selectedOfficerId} onChange={event => setSelectedOfficerId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] text-slate-200 focus:border-amber-400 focus:outline-none">
+            <option value="">Select officer</option>
+            {officers.map(officer => <option key={officer.officerId} value={officer.officerId}>{officer.name} · {officer.workload}/{officer.workloadCapacity}</option>)}
+          </select>
+          <button disabled={!selectedOfficerId || (!selectedFarm && !stats.node) } onClick={() => onAssign(selectedFarm)} className="rounded-lg bg-sky-500/20 px-2.5 py-1.5 text-[10px] font-bold text-sky-300 disabled:opacity-40">
+            {selectedFarm?.recommendationId ? 'Assign raid' : 'Assign inspection'}
+          </button>
+        </div>
+        {targetAssignment && (
+          <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-sky-300">Post-assignment workflow</div>
+            <div className="mt-1 text-[10px] text-slate-400">Officer acknowledges dispatch, travels to site, records evidence, then closes the inspection.</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[
+                ['ACCEPTED', 'Accept'],
+                ['EN_ROUTE', 'En route'],
+                ['ON_SITE', 'On site'],
+                ['COMPLETED', 'Complete']
+              ].map(([status, label]) => (
+                <button
+                  key={status}
+                  onClick={() => onUpdateAssignment(targetAssignment.assignmentId, { status })}
+                  disabled={targetAssignment.status === 'COMPLETED' || targetAssignment.status === 'CANCELLED'}
+                  className={`rounded border px-2 py-1 text-[9px] font-bold ${targetAssignment.status === status ? 'border-sky-400 bg-sky-500/20 text-sky-200' : 'border-slate-700 text-slate-400 hover:border-sky-400 hover:text-sky-200'} disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+        <div className="flex items-center justify-between"><h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Farmer / milk context</h4><span className="text-[9px] text-slate-600">NDLM register</span></div>
+        <div className="mt-2 space-y-2">
+          {filteredFarmers.slice(0, 5).map(farmer => {
+            const logs = stats.milkLogs.filter(item => item.farmerId === farmer.farmerId).slice(0, 2);
+            return <div key={farmer.farmerId} className="rounded-lg border border-slate-800 bg-slate-950 p-2">
+              <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-bold text-white">{farmer.name}</span><span className="text-[10px] text-amber-300">{farmer.registeredCows} cattle</span></div>
+              <div className="text-[9px] text-slate-500">{farmer.farmerId} · {farmer.animalBreed} · purity {farmer.purityScore}</div>
+              {logs.length > 0 && <div className="mt-1 text-[9px] text-slate-400">{logs.map(log => `${log.fatPercent ?? '—'}% fat / ${log.snfPercent ?? '—'}% SNF · ${log.yieldStatus}`).join('  |  ')}</div>}
+            </div>;
+          })}
+          {filteredFarmers.length === 0 && <p className="text-[10px] text-slate-500">No farmer records in this region.</p>}
+        </div>
+        {stats.anomalies.length > 0 && <button onClick={onOpenRisk} className="mt-3 flex items-center gap-1 text-[10px] font-bold text-amber-300 hover:text-amber-200"><ExternalLink className="h-3 w-3" /> Open explainable risk ledger ({stats.anomalies.length})</button>}
+      </div>
+    </div>
   );
 }
 
@@ -324,7 +499,7 @@ function ExplainableRiskPanel({
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function GovtAuditorDashboard() {
   const {
-    nodes, anomalies, dispatchRaid, liveIncidents,
+    nodes, farmers, pourEvents, anomalies, dispatchRaid, liveIncidents,
     selectedJurisdiction, setSelectedJurisdiction,
     activeOfficerLevel, setActiveOfficerLevel,
     OFFICER_HIERARCHY, STATE_DISTRICT_DIRECTORY,
@@ -332,7 +507,7 @@ export default function GovtAuditorDashboard() {
     injectVolumeAnomalySimulation,
     auditLog, LICENSE_REGISTRY, batches, ndlmVerificationCases, updateNdlmVerification,
     riskAnomalies, riskAggregates, raidRecommendations, officers, assignments,
-    reviewRiskAnomaly, approveRaidRecommendation, assignOfficerToTarget, updateAssignmentStatus,
+    reviewRiskAnomaly, approveRaidRecommendation, assignOfficerToTarget, updateAssignmentStatus, flagEntity,
   } = useAnveshana();
 
   const mapRef         = useRef(null);
@@ -346,6 +521,10 @@ export default function GovtAuditorDashboard() {
   const [auditFilter,          setAuditFilter]          = useState('ALL');
   const [selectedVerificationId, setSelectedVerificationId] = useState(null);
   const [fieldEvidence, setFieldEvidence] = useState({ earTagSeen: false, animalMatches: false, ownerConfirmed: false, vaccinationChecked: false, notes: '' });
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const [mapSelection, setMapSelection] = useState(null);
+  const [selectedFarmId, setSelectedFarmId] = useState('');
+  const [selectedMapOfficerId, setSelectedMapOfficerId] = useState('');
 
   const isHindi = language === 'HI';
   const currentJurisdictionData = STATE_DISTRICT_DIRECTORY[selectedJurisdiction] || STATE_DISTRICT_DIRECTORY['FSSAI-DL'];
@@ -382,6 +561,75 @@ export default function GovtAuditorDashboard() {
     const ids = new Set(visibleNodes.map(n => n.nodeId));
     return anomalies.filter(a => ids.has(a.nodeId));
   }, [anomalies, visibleNodes]);
+
+  const mapRegionStats = useMemo(() => {
+    const scopedNodes = visibleNodes;
+    const selected = mapSelection;
+    const selectedNode = selected?.nodeId ? scopedNodes.find(node => node.nodeId === selected.nodeId) : null;
+    const district = selected?.district || selectedNode?.district || (isAllDistricts ? null : selectedDistrictName);
+    const nodeIds = new Set(scopedNodes.filter(node => !district || node.district === district).map(node => node.nodeId));
+    const regionFarmers = farmers.filter(farmer => (
+      (!district || farmer.district === district) &&
+      (!selectedNode || farmer.nodeId === selectedNode.nodeId)
+    ));
+    const regionAnomalies = [...(riskAnomalies || []), ...(anomalies || [])].filter((anomaly, index, list) => (
+      (!district || anomaly.district === district || anomaly.nodeId === selectedNode?.nodeId || scopedNodes.some(node => node.nodeId === anomaly.nodeId && node.district === district)) &&
+      (!selectedNode || anomaly.nodeId === selectedNode.nodeId || anomaly.farmId === selectedNode.nodeId || anomaly.farmerId === selectedNode.nodeId) &&
+      (!anomaly.nodeId || nodeIds.has(anomaly.nodeId) || anomaly.district === district) &&
+      list.findIndex(item => item.anomalyId === anomaly.anomalyId) === index
+    ));
+    const farmersById = new Map(regionFarmers.map(farmer => [farmer.farmerId, farmer]));
+    const highRiskFarms = regionAnomalies
+      .filter(anomaly => (anomaly.riskScore || 0) >= 50)
+      .map(anomaly => {
+        const recommendation = (raidRecommendations || []).find(item => item.targetId === anomaly.farmId || item.targetId === anomaly.farmerId);
+        return {
+          farmId: anomaly.farmId || anomaly.farmerId || anomaly.nodeId,
+          farmer: farmersById.get(anomaly.farmerId),
+          riskScore: anomaly.riskScore || Math.round((anomaly.permanentPoints || 0) + (anomaly.provisionalPoints || 0)),
+          type: anomaly.type,
+          status: anomaly.status,
+          recommendationId: recommendation?.recommendationId || null
+        };
+      })
+      .filter((item, index, list) => item.farmId && list.findIndex(candidate => candidate.farmId === item.farmId) === index);
+    const assignmentsForRegion = (assignments || []).filter(item => (
+      (item.district && item.district === district) ||
+      regionAnomalies.some(anomaly => item.targetId === (anomaly.farmId || anomaly.farmerId || anomaly.nodeId)) ||
+      scopedNodes.some(node => item.targetId === node.nodeId && (!district || node.district === district))
+    ));
+    const regionNode = selectedNode || scopedNodes.find(node => !district || node.district === district);
+    const regionLogs = pourEvents.filter(log => (
+      regionFarmers.some(farmer => farmer.farmerId === log.farmerId) ||
+      (regionNode && log.nodeId === regionNode.nodeId)
+    ));
+    return {
+      district: district || regionNode?.district || selectedDistrictName,
+      node: regionNode,
+      farmers: regionFarmers,
+      farmerCount: new Set(regionFarmers.map(farmer => farmer.farmerId)).size,
+      cattleCount: regionFarmers.reduce((total, farmer) => total + (farmer.registeredCows || 0), 0),
+      anomalies: regionAnomalies,
+      anomalyCount: new Set([
+        ...regionAnomalies.map(item => item.anomalyId),
+        ...anomalies.filter(item => (!district || item.nodeId === selectedNode?.nodeId || item.district === district)).map(item => item.anomalyId)
+      ]).size,
+      highRiskFarms,
+      assignments: assignmentsForRegion,
+      milkLogs: regionLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    };
+  }, [farmers, pourEvents, anomalies, riskAnomalies, raidRecommendations, assignments, visibleNodes, mapSelection, selectedDistrictName, isAllDistricts]);
+
+  const mapWeather = useMemo(() => {
+    const seed = (mapRegionStats.node?.coordinates?.lat || currentJurisdictionData.center?.[0] || 28.6) + (mapRegionStats.node?.coordinates?.lng || currentJurisdictionData.center?.[1] || 77.2);
+    const temp = Math.round(27 + Math.abs(Math.sin(seed)) * 9);
+    return { temp, humidity: 48 + Math.round(Math.abs(Math.cos(seed)) * 34), wind: 8 + Math.round(Math.abs(Math.sin(seed * 2)) * 12), condition: temp > 32 ? 'Hot & clear' : 'Partly cloudy' };
+  }, [mapRegionStats.node, currentJurisdictionData]);
+
+  const availableMapOfficers = useMemo(() => officers.filter(officer => (
+    officer.status !== 'OFF_DUTY' && officer.availability !== 'OFFLINE' &&
+    (officer.workload || 0) < (officer.workloadCapacity || 0)
+  )), [officers]);
 
   // ── KPI Metrics ─────────────────────────────────────────────────────────
   const raidedCount      = anomalies.filter(a => a.status === 'RAID_DISPATCHED').length;
@@ -451,7 +699,12 @@ export default function GovtAuditorDashboard() {
     // Add Markers for all nodes in scope
     visibleNodes.forEach(node => {
       const nodeAnoms = visibleAnomalies.filter(a => a.nodeId === node.nodeId);
-      const maxRisk   = nodeAnoms.length > 0 ? Math.max(...nodeAnoms.map(a => a.riskScore)) : 10;
+      const nodeRisk = [...(riskAnomalies || []), ...(anomalies || [])].filter((item, index, list) => (
+        (item.nodeId === node.nodeId || item.district === node.district) &&
+        list.findIndex(candidate => candidate.anomalyId === item.anomalyId) === index
+      ));
+      const allRiskScores = [...nodeAnoms, ...nodeRisk].map(a => a.riskScore || ((a.permanentPoints || 0) + (a.provisionalPoints || 0)));
+      const maxRisk   = allRiskScores.length > 0 ? Math.max(...allRiskScores) : 10;
       const pinColor  = maxRisk >= 80 ? '#ef4444' : maxRisk >= 50 ? '#f59e0b' : '#10b981';
 
       const icon = L.divIcon({
@@ -469,12 +722,20 @@ export default function GovtAuditorDashboard() {
       });
 
       const marker = L.marker([node.coordinates.lat, node.coordinates.lng], { icon }).addTo(map);
-      marker.on('click', () => map.flyTo([node.coordinates.lat, node.coordinates.lng], 13, { duration: 1.2 }));
+      marker.on('click', () => {
+        setMapSelection({ kind: 'village', name: node.name, district: node.district, nodeId: node.nodeId });
+        map.flyTo([node.coordinates.lat, node.coordinates.lng], 13, { duration: 1.2 });
+      });
+      const nodeFarmers = farmers.filter(farmer => farmer.nodeId === node.nodeId);
+      const cattleCount = nodeFarmers.reduce((total, farmer) => total + (farmer.registeredCows || 0), 0);
       marker.bindPopup(`
         <div style="padding:6px;min-width:180px;color:#f8fafc;font-family:sans-serif;">
           <div style="font-size:11px;font-weight:800;color:#10b981;letter-spacing:0.5px;">${node.nodeId} (${node.type})</div>
           <div style="font-size:13px;font-weight:800;color:#ffffff;margin-top:2px;">${node.name}</div>
           <div style="font-size:11px;color:#94a3b8;margin-top:4px;">District: <b>${node.district}</b> • ${node.state}</div>
+          <div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${nodeFarmers.length} registered farmers • ${cattleCount} cattle • ${nodeRisk.length} risk signals</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">${node.dailyVolumeLitres.toLocaleString()} L/day • ${node.currentTemperatureC}°C tank • ${node.storageCapacityLitres.toLocaleString()} L capacity</div>
+          <div style="font-size:10px;color:${node.connectivity === 'ONLINE' ? '#34d399' : '#fbbf24'};font-weight:700;margin-top:4px;">${node.connectivity} • heartbeat ${fmtTs(node.lastHeartbeatAt)}</div>
           <div style="font-size:11px;color:${pinColor};font-weight:800;margin-top:4px;background:rgba(15,23,42,0.6);padding:2px 6px;border-radius:4px;display:inline-block;">Risk Rating: ${maxRisk}/100</div>
         </div>`);
     });
@@ -492,11 +753,16 @@ export default function GovtAuditorDashboard() {
         mapInstanceRef.current = null;
       }
     };
-  }, [selectedJurisdiction, visibleNodes, visibleAnomalies, activeOfficerLevel, activeTab, currentJurisdictionData]);
+  }, [selectedJurisdiction, visibleNodes, visibleAnomalies, activeOfficerLevel, activeTab, currentJurisdictionData, farmers, riskAnomalies, anomalies, mapExpanded]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleDistrictChange = (distName) => {
     setSelectedDistrictName(distName);
+    if (!distName || distName === 'ALL' || distName.toLowerCase().startsWith('all')) {
+      setMapSelection(null);
+    } else {
+      setMapSelection({ kind: 'district', name: distName, district: distName });
+    }
     if (!mapInstanceRef.current) return;
     if (!distName || distName === 'ALL' || distName.toLowerCase().startsWith('all')) {
       if (visibleNodes.length > 1) {
@@ -509,6 +775,22 @@ export default function GovtAuditorDashboard() {
       const distObj = districtList.find(d => d.name === distName || d.nameHindi === distName);
       if (distObj) mapInstanceRef.current.flyTo([distObj.lat, distObj.lng], distObj.zoom || 11, { duration: 1.5 });
     }
+  };
+
+  const assignMapOfficer = async (farm) => {
+    if (!selectedMapOfficerId) return;
+    const targetId = farm?.farmId || mapRegionStats.node?.nodeId;
+    if (!targetId) return;
+    const recommendationId = farm?.recommendationId || null;
+    const assignment = await assignOfficerToTarget({
+      officerId: selectedMapOfficerId,
+      recommendationId,
+      targetType: recommendationId ? 'RAID_RECOMMENDATION' : (farm ? 'FARM' : 'INSPECTION'),
+      targetId,
+      district: mapRegionStats.district,
+      note: farm ? `High-risk farm inspection in ${mapRegionStats.district}` : `Regional inspection at ${mapRegionStats.node?.name || mapRegionStats.district}`
+    });
+    if (assignment) setSelectedMapOfficerId('');
   };
 
   const handleStateChange = (code) => {
@@ -738,7 +1020,7 @@ export default function GovtAuditorDashboard() {
 
             {/* GIS Map + District filter */}
             <div className="lg:col-span-7 space-y-3">
-              <div className="glass-panel p-5 rounded-2xl">
+              <div className={`glass-panel rounded-2xl p-5 ${mapExpanded ? 'fixed inset-3 z-[60] overflow-y-auto border-amber-500/40 bg-[#090d1a] shadow-2xl' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-amber-400" />
@@ -746,9 +1028,22 @@ export default function GovtAuditorDashboard() {
                       {isHindi ? 'जिला विसंगति हीटमैप' : 'DISTRICT ANOMALY HEATMAP'}
                     </h3>
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">
-                    {isHindi ? `ज़ूम: ${selectedDistrictName}` : `Zoom: ${selectedDistrictName}`}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="hidden text-[10px] font-mono font-bold text-emerald-400 sm:inline">{isHindi ? `ज़ूम: ${selectedDistrictName}` : `Zoom: ${selectedDistrictName}`}</span>
+                    <button
+                      onClick={() => {
+                        if (!mapExpanded && !mapSelection) {
+                          const firstNode = visibleNodes[0];
+                          setMapSelection(firstNode ? { kind: 'village', name: firstNode.name, district: firstNode.district, nodeId: firstNode.nodeId } : null);
+                        }
+                        setMapExpanded(previous => !previous);
+                      }}
+                      className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-300 hover:bg-amber-500/20"
+                    >
+                      {mapExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                      {mapExpanded ? 'Close expanded map' : 'Expand map'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* District filter pills */}
@@ -768,7 +1063,25 @@ export default function GovtAuditorDashboard() {
                   ))}
                 </div>
 
-                <div ref={mapRef} className="w-full h-96 rounded-xl overflow-hidden border border-slate-800 shadow-inner z-0" />
+                <div className={mapExpanded ? 'grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]' : ''}>
+                  <div ref={mapRef} className={`w-full rounded-xl overflow-hidden border border-slate-800 shadow-inner z-0 ${mapExpanded ? 'h-[calc(100vh-245px)] min-h-[480px]' : 'h-96'}`} />
+                  {mapExpanded && (
+                    <RegionInspector
+                      selectedRegion={mapSelection}
+                      stats={mapRegionStats}
+                      weather={mapWeather}
+                      officers={availableMapOfficers}
+                      selectedOfficerId={selectedMapOfficerId}
+                      setSelectedOfficerId={setSelectedMapOfficerId}
+                      selectedFarmId={selectedFarmId}
+                      setSelectedFarmId={setSelectedFarmId}
+                      onAssign={assignMapOfficer}
+                      onUpdateAssignment={updateAssignmentStatus}
+                      onFlagEntity={flagEntity}
+                      onOpenRisk={() => { setMapExpanded(false); setActiveTab('RISK'); }}
+                    />
+                  )}
+                </div>
 
                 <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 px-1">
                   <div className="flex items-center gap-3">
