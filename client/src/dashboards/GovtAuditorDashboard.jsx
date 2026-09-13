@@ -574,7 +574,14 @@ export default function GovtAuditorDashboard() {
     ));
     const regionAnomalies = [...(riskAnomalies || []), ...(anomalies || [])].filter((anomaly, index, list) => (
       (!district || anomaly.district === district || anomaly.nodeId === selectedNode?.nodeId || scopedNodes.some(node => node.nodeId === anomaly.nodeId && node.district === district)) &&
-      (!selectedNode || anomaly.nodeId === selectedNode.nodeId || anomaly.farmId === selectedNode.nodeId || anomaly.farmerId === selectedNode.nodeId) &&
+      (!selectedNode ||
+        anomaly.nodeId === selectedNode.nodeId ||
+        anomaly.farmId === selectedNode.nodeId ||
+        anomaly.farmerId === selectedNode.nodeId ||
+        // The map popup presents node plus district risk signals. Keep the
+        // inspector aligned so a selected collection point never shows zero
+        // while its popup reports district-level signals.
+        anomaly.district === selectedNode.district) &&
       (!anomaly.nodeId || nodeIds.has(anomaly.nodeId) || anomaly.district === district) &&
       list.findIndex(item => item.anomalyId === anomaly.anomalyId) === index
     ));
@@ -610,10 +617,7 @@ export default function GovtAuditorDashboard() {
       farmerCount: new Set(regionFarmers.map(farmer => farmer.farmerId)).size,
       cattleCount: regionFarmers.reduce((total, farmer) => total + (farmer.registeredCows || 0), 0),
       anomalies: regionAnomalies,
-      anomalyCount: new Set([
-        ...regionAnomalies.map(item => item.anomalyId),
-        ...anomalies.filter(item => (!district || item.nodeId === selectedNode?.nodeId || item.district === district)).map(item => item.anomalyId)
-      ]).size,
+      anomalyCount: new Set(regionAnomalies.map(item => item.anomalyId)).size,
       highRiskFarms,
       assignments: assignmentsForRegion,
       milkLogs: regionLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))

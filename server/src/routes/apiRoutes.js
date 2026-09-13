@@ -23,6 +23,7 @@ function validateMilkLog(body) {
 }
 
 function emitCollectionUpdate(io, eventName, request) {
+  console.log(`[ANVESHANA][COLLECTION][EVENT] event=${eventName} requestId=${request?.requestId || 'unknown'} farmerId=${request?.farmerId || 'unknown'} status=${request?.status || 'unknown'}`);
   io.emit(eventName, request);
   if (request?.farmerId) io.to(`farmer:${request.farmerId}`).emit(eventName, request);
 }
@@ -215,6 +216,7 @@ router.post('/aggregator/pour', (req, res) => {
 
   // Cross-device collection workflow. This is intentionally in-memory for the prototype.
   router.get('/sync', (req, res) => {
+    console.log(`[ANVESHANA][SYNC] milkLogs=${store.milkLogs.length + pourEvents.length} collectionRequests=${(store.collectionRequests || []).length} ndlmRegistrations=${(store.ndlmRegistrations || []).length}`);
     res.json({
       milkLogs: [...store.milkLogs, ...pourEvents],
       collectionRequests: store.collectionRequests || [],
@@ -257,6 +259,7 @@ router.post('/aggregator/pour', (req, res) => {
       createdBy: req.user.role || 'AGGREGATOR'
     };
     store.collectionRequests.unshift(request);
+    console.log(`[ANVESHANA][COLLECTION][CREATED] requestId=${request.requestId} farmerId=${request.farmerId} nodeId=${request.nodeId} amountKg=${request.requestedAmountKg}`);
     emitCollectionUpdate(io, 'collection_request_created', request);
     res.status(201).json({ success: true, collectionRequest: request });
   });
@@ -272,6 +275,7 @@ router.post('/aggregator/pour', (req, res) => {
     request.status = approval === 'APPROVED' ? 'APPROVED_BY_FARMER' : 'DECLINED_BY_FARMER';
     request.approvedAt = new Date().toISOString();
     request.approvedBy = req.body.approvedBy || req.user.role || 'FARMER';
+    console.log(`[ANVESHANA][COLLECTION][APPROVAL] requestId=${request.requestId} approval=${approval} farmerId=${request.farmerId}`);
     emitCollectionUpdate(io, 'collection_request_updated', request);
     emitCollectionUpdate(io, 'collection_request_approved', request);
     res.json({ success: true, collectionRequest: request });
@@ -299,6 +303,7 @@ router.post('/aggregator/pour', (req, res) => {
     };
     request.status = 'MEASUREMENTS_RECORDED';
     request.measuredAt = request.aggregatorMeasurements.recordedAt;
+    console.log(`[ANVESHANA][COLLECTION][MEASURED] requestId=${request.requestId} weightKg=${weightKg} fatPercent=${fatPercent} snfPercent=${snfPercent}`);
     emitCollectionUpdate(io, 'collection_request_updated', request);
     emitCollectionUpdate(io, 'collection_measurements_recorded', request);
     res.json({ success: true, collectionRequest: request });
@@ -317,6 +322,7 @@ router.post('/aggregator/pour', (req, res) => {
       transferredAt: new Date().toISOString()
     };
     request.status = 'TRANSFERRED_TO_CHILLING_CENTER';
+    console.log(`[ANVESHANA][COLLECTION][TRANSFERRED] requestId=${request.requestId} destination=${request.transfer.destinationNodeId || 'unknown'} amountKg=${request.transfer.amountKg || 'unknown'}`);
     emitCollectionUpdate(io, 'collection_request_updated', request);
     emitCollectionUpdate(io, 'collection_transferred', request);
     res.json({ success: true, collectionRequest: request });
