@@ -455,3 +455,50 @@ Built for **HackIndia AI & Web3 Builders Hackathon 2026**
 *"Hardware-anchored supply chain integrity, not paper receipts."*
 
 </div>
+
+# Anveshana Feature Analysis & Roadmap Suggestions
+
+## 1. Features Currently Lacking (According to Roadmap)
+
+Based on the project's README, the following phases and features are planned but not yet implemented. They represent the current gaps in the Anveshana protocol:
+
+### Phase 2: True Hardware IoT Integration
+Currently, the system relies on an AMCU simulator. To achieve true tamper-evident security, it needs:
+- **Physical Sensor Integration:** Encrypted direct serial/Bluetooth data streaming from physical AMCU and Mandara milk analyzers.
+- **Hardware Cryptography:** HSM (Hardware Security Module) keypair provisioning burned directly onto physical hardware units.
+- **Zero-Interception Guarantee:** Ensuring data flows strictly from raw sensor to cloud without any human-writable entry points or overrides.
+
+### Phase 3: Comprehensive Linguistic Accessibility
+While Hindi/English toggles are implemented, full accessibility for rural India requires:
+- **Full Language Support:** Expansion to all 22 official Indian languages (including Marathi, Gujarati, Tamil, Telugu, Punjabi, Bengali, Kannada).
+- **Smart Audio Localization:** Geo-location based automatic dialect and accent detection for Text-to-Speech (TTS) audio receipts (e.g., Haryanvi Hindi, Deshi Marathi).
+- **Offline Capabilities:** Offline TTS audio receipt generation to support constrained mobile devices in low-connectivity areas.
+
+### Phase 4: National Scale & Web3 Integration
+The current prototype simulates blockchain and lacks enterprise orchestration:
+- **Real Blockchain Deployment:** Replacing the simulation layer with live Polygon/Ethereum smart contract receipts.
+- **Government Integration:** Active integration with NABARD, NDDB (National Dairy Development Board), and FSSAI regulatory data pipelines.
+- **Scale Infrastructure:** Docker containerization and Kubernetes orchestration for nationwide cloud deployment across 120 million registered milch animals.
+
+---
+
+## 2. Suggestions for Additional Features & Services
+
+Beyond the current roadmap, here are highly impactful features and services that can elevate the Anveshana ecosystem:
+
+### For Farmers
+- **Predictive Yield Analytics (AI):** Analyze historical pour data to predict future milk yields and alert farmers to potential health issues in specific cattle before they become severe.
+- **Veterinary Telehealth & Marketplace:** Integrate a service where farmers can use their Anveshana Farm Purity Score and earnings to consult vets or purchase subsidized, verified cattle feed.
+- **Incentive Tokenomics (Web3):** Introduce a utility token reward system for farmers who consistently provide high-quality (high Fat/SNF) unadulterated milk, redeemable within the ecosystem.
+
+### For Aggregators & Transport
+- **IoT Edge Computing:** Run lightweight anomaly detection AI models directly on the AMCU tablets. This allows for instant fraud detection even during severe network outages, syncing the flag to the cloud once reconnected.
+- **Active Cold-Chain IoT:** Integrate direct feeds from GPS and temperature sensors in Bulk Milk Chiller transports to provide an unbroken, real-time temperature graph to the FSSAI and consumers.
+
+### For Quality Control & FSSAI
+- **Dynamic Risk Scoring:** Use federated learning to continuously update the Isolation Forest model based on new fraud patterns discovered across different states, without centralizing sensitive raw data.
+- **Automated Fine/Penalty Smart Contracts:** If a transport is flagged for dilution and confirmed by the FSSAI, a smart contract could automatically execute a penalty or withhold payment from the aggregator/transport company.
+
+### For Consumers
+- **Consumer Feedback Loop:** Allow consumers to report issues (e.g., spoilage before expiry) directly from the QR passport interface. This data can be fed back into the AI to trace systemic issues back to a specific transit hop.
+- **Nutritional Transparency:** Show detailed nutritional breakdowns based on the exact Fat/SNF readings of the specific batch they purchased, rather than generic packaging averages.

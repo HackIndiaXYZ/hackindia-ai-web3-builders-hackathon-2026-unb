@@ -1,22 +1,28 @@
 import express from 'express';
 import http from 'http';
+import 'dotenv/config';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
-import apiRoutes from './routes/apiRoutes.js';
+import createApiRoutes from './routes/apiRoutes.js';
 import { authenticateToken } from './middleware/authMiddleware.js';
 
 const app = express();
 const server = http.createServer(app);
+const PORT = process.env.PORT || 5000;
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
 const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: allowedOrigins.length ? allowedOrigins : true,
+    methods: ['GET', 'POST'],
+    credentials: false
   }
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins.length ? allowedOrigins : true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Role', 'X-Node-Id']
+}));
 app.use(express.json());
 
 // Request logging middleware
@@ -26,7 +32,7 @@ app.use((req, res, next) => {
 });
 
 // Mount REST API Routes
-app.use('/api/v1', authenticateToken, apiRoutes);
+app.use('/api/v1', authenticateToken, createApiRoutes(io));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'UP', protocol: 'Anveshana Open Dairy Intelligence Protocol v1.0', timestamp: new Date() });

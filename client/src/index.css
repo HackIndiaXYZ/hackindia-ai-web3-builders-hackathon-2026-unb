@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#070b14] text-slate-100 font-sans antialiased;
+    @apply bg-white text-slate-900 font-sans antialiased;
     background-image: 
       radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 50%),
@@ -12,6 +12,74 @@
     background-attachment: fixed;
   }
 }
+
+body, button, input, select, textarea { font-family: "Noto Sans", "Segoe UI", Arial, sans-serif; }
+.font-mono { font-family: "Noto Sans", "Segoe UI", Arial, sans-serif !important; letter-spacing: 0.01em; }
+
+.app-theme {
+  min-height: 100vh;
+}
+
+.font-scale-large { font-size: 108%; }
+.font-scale-x-large { font-size: 116%; }
+
+/* Existing dashboard utilities are remapped here so all portals share one light default. */
+.theme-light { background: #f8fafc; color: #0f172a; }
+.theme-light [class*="bg-[#"],
+.theme-light [class*="bg-slate-950"],
+.theme-light [class*="bg-slate-900"],
+.theme-light [class*="bg-slate-800"],
+.theme-light [class*="bg-black"] { background-color: #ffffff !important; }
+.theme-light [class*="bg-slate-700"],
+.theme-light [class*="bg-slate-600"] { background-color: #f1f5f9 !important; }
+.theme-light [class*="bg-gradient"] { background-image: none !important; }
+.theme-light [class*="bg-emerald-950"],
+.theme-light [class*="bg-teal-950"],
+.theme-light [class*="bg-cyan-950"] { background-color: #ecfdf5 !important; }
+.theme-light [class*="bg-amber-950"] { background-color: #fffbeb !important; }
+.theme-light [class*="bg-rose-950"],
+.theme-light [class*="bg-red-950"] { background-color: #fff1f2 !important; }
+.theme-light [class*="bg-purple-950"] { background-color: #faf5ff !important; }
+.theme-light [class*="text-white"] { color: #0f172a !important; }
+.theme-light [class*="text-slate-100"],
+.theme-light [class*="text-slate-200"],
+.theme-light [class*="text-slate-300"] { color: #334155 !important; }
+.theme-light [class*="text-slate-400"],
+.theme-light [class*="text-slate-500"] { color: #64748b !important; }
+.theme-light [class*="text-slate-600"] { color: #475569 !important; }
+.theme-light [class*="border-slate-900"],
+.theme-light [class*="border-slate-800"],
+.theme-light [class*="border-slate-700"] { border-color: #e2e8f0 !important; }
+.theme-light .glass-panel,
+.theme-light .glass-panel-glow,
+.theme-light .glass-input { background: #ffffff; border-color: #cbd5e1; color: #0f172a; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+.theme-light .glass-input::placeholder { color: #64748b; }
+.theme-light .leaflet-container { background: #e2e8f0 !important; }
+.theme-light ::-webkit-scrollbar-track { background: #f1f5f9; }
+.theme-light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+.theme-light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.theme-dark { background: #070b14; color: #f8fafc; }
+
+/* Public-service landing treatment: clear hierarchy, fewer effects, and predictable targets. */
+.public-service-home .rounded-3xl { border-radius: 0.75rem; }
+.public-service-home .rounded-2xl { border-radius: 0.625rem; }
+.public-service-home .rounded-xl { border-radius: 0.5rem; }
+.public-service-home .shadow-2xl,
+.public-service-home .shadow-xl { box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
+.theme-light .public-service-home { background: #f8fafc; }
+.theme-light .public-service-home [class*="bg-gradient"] { background-image: none !important; }
+.theme-light .public-service-home [class*="from-emerald-950"],
+.theme-light .public-service-home [class*="from-teal-950"],
+.theme-light .public-service-home [class*="from-amber-950"],
+.theme-light .public-service-home [class*="from-red-950"],
+.theme-light .public-service-home [class*="from-cyan-950"],
+.theme-light .public-service-home [class*="from-purple-950"] { background-color: #ffffff !important; }
+.theme-light .public-service-home [class*="bg-emerald-950"],
+.theme-light .public-service-home [class*="bg-teal-950"],
+.theme-light .public-service-home [class*="bg-amber-950"],
+.theme-light .public-service-home [class*="bg-red-950"],
+.theme-light .public-service-home [class*="bg-cyan-950"] { background-color: #f0fdf4 !important; }
 
 /* Glassmorphism DPI Utilities */
 .glass-panel {
@@ -61,3 +129,10 @@
   background: #090d16 !important;
   font-family: 'Inter', sans-serif !important;
 }
+
+.leaflet-div-icon,
+.custom-map-pin {
+  background: transparent !important;
+  border: none !important;
+}
+

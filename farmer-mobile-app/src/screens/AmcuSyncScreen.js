@@ -1,144 +1,230 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  SafeAreaView
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 
 export default function AmcuSyncScreen({ language }) {
-  const isHindi = language === 'HI';
+  const { t } = useTranslation(language);
+  const [testing, setTesting] = useState(false);
+
+  const handleTest = () => {
+    setTesting(true);
+    setTimeout(() => {
+      setTesting(false);
+      Alert.alert(
+        t('amcuTestTitle'),
+        t('amcuTestDesc')
+      );
+    }, 600);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.headerRow}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      {/* Main Machine Status Card */}
+      <View style={styles.mainCard}>
+        <View style={styles.topRow}>
+          <View>
             <Text style={styles.title}>
-              {isHindi ? 'AMCU Essae-SN8831 हार्डवेयर सिंक' : 'AMCU Essae-SN8831 Hardware Sync'}
+              {t('amcuTitle')}
             </Text>
-            <View style={styles.onlineBadge}>
-              <Text style={styles.onlineText}>● ONLINE</Text>
-            </View>
-          </View>
-          <Text style={styles.sub}>Serial: ESSAE-SN8831-VLC22 (Nissing Station)</Text>
-
-          <View style={styles.grid}>
-            <View style={styles.gridBox}>
-              <Text style={styles.gridLabel}>Lactometer Calibration</Text>
-              <Text style={styles.gridValGreen}>100% Calibrated</Text>
-            </View>
-            <View style={styles.gridBox}>
-              <Text style={styles.gridLabel}>Bluetooth / NFC Signal</Text>
-              <Text style={styles.gridValTeal}>-48 dBm (Strong)</Text>
-            </View>
+            <Text style={styles.sub}>
+              {t('amcuSub')}
+            </Text>
           </View>
 
-          <View style={styles.bufferBox}>
-            <Text style={styles.bufferLabel}>{isHindi ? 'ऑफलाइन कतार बफर:' : 'Offline Queue Buffer:'}</Text>
-            <Text style={styles.bufferVal}>0 Pending • Cloud Sync Active</Text>
+          <View style={styles.onlineBadge}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>{t('online')}</Text>
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        {/* 4 Sensor Stat Cards */}
+        <View style={styles.grid}>
+          <View style={styles.gridCard}>
+            <Text style={styles.gLabel}>{t('scale')}</Text>
+            <Text style={styles.gValGreen}>{t('calibrated')}</Text>
+            <Text style={styles.gNote}>{t('scaleNote')}</Text>
+          </View>
+
+          <View style={styles.gridCard}>
+            <Text style={styles.gLabel}>{t('lactometer')}</Text>
+            <Text style={styles.gValGreen}>100% {t('passed')}</Text>
+            <Text style={styles.gNote}>{t('lactoNote')}</Text>
+          </View>
+
+          <View style={styles.gridCard}>
+            <Text style={styles.gLabel}>{t('signal')}</Text>
+            <Text style={styles.gValBlue}>{t('strong')}</Text>
+            <Text style={styles.gNote}>4G / Wi-Fi Active</Text>
+          </View>
+
+          <View style={styles.gridCard}>
+            <Text style={styles.gLabel}>{t('pending')}</Text>
+            <Text style={styles.gValDark}>0 {t('pending')}</Text>
+            <Text style={styles.gNote}>{t('fullySynced')}</Text>
+          </View>
+        </View>
+
+        {/* Test Button */}
+        <TouchableOpacity
+          style={styles.testBtn}
+          onPress={handleTest}
+          disabled={testing}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.testBtnText}>
+            {testing
+              ? t('checking')
+              : t('runDiagnostics')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Info Card */}
+      <View style={styles.infoCard}>
+        <Text style={styles.infoIcon}>💡</Text>
+        <Text style={styles.infoText}>
+          {t('amcuInfo')}
+        </Text>
+      </View>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 24,
+    gap: 12,
   },
-  card: {
-    backgroundColor: '#090d1a',
-    borderColor: '#1e293b',
+  mainCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderRadius: 20,
+    borderColor: '#E2E8F0',
     padding: 16,
+    gap: 14,
+    elevation: 1,
   },
-  headerRow: {
+  topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   title: {
-    color: '#ffffff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
-    flex: 1,
-    marginRight: 8,
+    color: '#0F172A',
   },
   sub: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    marginTop: 4,
-    marginBottom: 14,
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   onlineBadge: {
-    backgroundColor: '#022c22',
-    borderColor: '#10b981',
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
   },
   onlineText: {
-    color: '#34d399',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
+    color: '#15803D',
   },
   grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 14,
   },
-  gridBox: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
-    borderWidth: 1,
-    borderRadius: 14,
+  gridCard: {
+    width: '48%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 2,
   },
-  gridLabel: {
-    color: '#94a3b8',
+  gLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  gValGreen: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#15803D',
+    marginTop: 2,
+  },
+  gValBlue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0284C7',
+    marginTop: 2,
+  },
+  gValDark: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  gNote: {
     fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 2,
   },
-  gridValGreen: {
-    color: '#34d399',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  gridValTeal: {
-    color: '#2dd4bf',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  bufferBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    borderColor: '#1e293b',
+  testBtn: {
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderColor: '#CBD5E1',
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  bufferLabel: {
-    color: '#cbd5e1',
+  testBtnText: {
+    color: '#334155',
     fontSize: 12,
-  },
-  bufferVal: {
-    color: '#34d399',
-    fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    elevation: 1,
+  },
+  infoIcon: {
+    fontSize: 20,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 16,
   },
 });

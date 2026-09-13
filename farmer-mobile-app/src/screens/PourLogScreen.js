@@ -1,183 +1,270 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  Alert
+  ScrollView
 } from 'react-native';
 
-export default function PourLogScreen({ language, pourEvents, onQuickPour }) {
-  const isHindi = language === 'HI';
+export default function PourLogScreen({ language, pourEvents, onQuickPour, onViewReceipt }) {
+  const { t } = useTranslation(language);
+  const [filter, setFilter] = useState('ALL'); // 'ALL' | 'MORNING' | 'EVENING'
+
+  const filteredPours = pourEvents.filter((p) => {
+    if (filter === 'ALL') return true;
+    if (filter === 'MORNING') return p.session.includes('सुबह') || p.session.includes('Morning');
+    if (filter === 'EVENING') return p.session.includes('शाम') || p.session.includes('Evening');
+    return true;
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>
-            {isHindi ? 'दूध संग्रह व SHA-256 रसीदें' : 'Milk Pour Log & Receipts'}
-          </Text>
-          <TouchableOpacity style={styles.addBtn} onPress={onQuickPour}>
-            <Text style={styles.addBtnText}>{isHindi ? '+ दर्ज करें' : '+ Log Pour'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      {/* Header with Filter Chips */}
+      <View style={styles.headerCard}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>
+              {t('milkCollectionReceipts')}
+            </Text>
+            <Text style={styles.headerSub}>
+              {pourEvents.length} {t('totalSessions')}
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.logBtn} onPress={onQuickPour} activeOpacity={0.85}>
+            <Text style={styles.logBtnText}>{t('logMilk')}</Text>
           </TouchableOpacity>
         </View>
 
-        {pourEvents.map((pour) => (
-          <View key={pour.eventId} style={styles.pourCard}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={styles.eventId}>{pour.eventId}</Text>
-                <Text style={styles.timeStr}>{new Date(pour.timestamp).toLocaleString()}</Text>
-              </View>
-              <View style={styles.payoutBadge}>
-                <Text style={styles.payoutText}>₹{pour.payoutINR}</Text>
-              </View>
-            </View>
+        {/* Filter Pills */}
+        <View style={styles.filterRow}>
+          {[
+            { id: 'ALL', label: t('allSessions') },
+            { id: 'MORNING', label: t('morning') },
+            { id: 'EVENING', label: t('evening') }
+          ].map((item) => {
+            const active = filter === item.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setFilter(item.id)}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
-            <View style={styles.grid}>
-              <View style={styles.gridBox}>
-                <Text style={styles.boxLabel}>Weight</Text>
-                <Text style={styles.boxVal}>{pour.weightKg} kg</Text>
-              </View>
-              <View style={styles.gridBox}>
-                <Text style={styles.boxLabel}>Fat</Text>
-                <Text style={[styles.boxVal, { color: '#10b981' }]}>{pour.fatPercent}%</Text>
-              </View>
-              <View style={styles.gridBox}>
-                <Text style={styles.boxLabel}>SNF</Text>
-                <Text style={[styles.boxVal, { color: '#14b8a6' }]}>{pour.snfPercent}%</Text>
-              </View>
+      {/* List of Pours */}
+      {filteredPours.map((pour) => (
+        <View key={pour.eventId} style={styles.pourCard}>
+          <View style={styles.pourCardTop}>
+            <View>
+              <Text style={styles.sessionTitle}>{pour.session}</Text>
+              <Text style={styles.dateText}>{pour.dateStr} • {pour.center}</Text>
             </View>
+            <View style={styles.payoutBox}>
+              <Text style={styles.payoutAmount}>₹{pour.payoutINR}</Text>
+              <Text style={styles.payoutStatus}>✓ {t('paidToBank')}</Text>
+            </View>
+          </View>
 
+          {/* Stat Boxes */}
+          <View style={styles.metricGrid}>
+            <View style={styles.metricCard}>
+              <Text style={styles.mLabel}>{t('weight')}</Text>
+              <Text style={styles.mVal}>{pour.weightKg} kg</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.mLabel}>{t('fat')}</Text>
+              <Text style={[styles.mVal, { color: '#15803D' }]}>{pour.fatPercent}%</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.mLabel}>{t('snf')}</Text>
+              <Text style={[styles.mVal, { color: '#0284C7' }]}>{pour.snfPercent}%</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.mLabel}>{t('ratePerL')}</Text>
+              <Text style={styles.mVal}>₹{pour.ratePerLiter}</Text>
+            </View>
+          </View>
+
+          {/* Footer Receipt Action */}
+          <View style={styles.cardFooter}>
+            <Text style={styles.receiptCode}>{t('receiptCode')} {pour.receiptHash}</Text>
             <TouchableOpacity
-              style={styles.hashRow}
-              onPress={() => Alert.alert('SHA-256 Proof Audit', `Receipt Hash:\n${pour.receiptHash}\n\nStatus: Hardware AMCU Tamper-Evident Lock Verified`)}
+              style={styles.viewSlipBtn}
+              onPress={() => onViewReceipt && onViewReceipt(pour)}
             >
-              <Text style={styles.hashText} numberOfLines={1}>
-                {pour.receiptHash || 'sha256:7d2b9af8103c31ff78201a44eef93810'}
+              <Text style={styles.viewSlipText}>
+                {t('viewSlipLong')}
               </Text>
-              <Text style={styles.auditLink}>{isHindi ? 'जांचें ↗' : 'Audit ↗'}</Text>
             </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      ))}
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
+    padding: 14,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  headerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    elevation: 1,
   },
-  headerRow: {
+  headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    alignItems: 'center',
   },
-  title: {
-    color: '#ffffff',
+  headerTitle: {
     fontSize: 16,
     fontWeight: '800',
+    color: '#0F172A',
   },
-  addBtn: {
-    backgroundColor: '#10b981',
+  headerSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  logBtn: {
+    backgroundColor: '#15803D',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
   },
-  addBtnText: {
-    color: '#022c22',
+  logBtnText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
   },
-  pourCard: {
-    backgroundColor: '#090d1a',
-    borderColor: '#1e293b',
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  eventId: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  timeStr: {
-    color: '#94a3b8',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  payoutBadge: {
-    backgroundColor: '#022c22',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  payoutText: {
-    color: '#34d399',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  grid: {
+  filterRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 10,
   },
-  gridBox: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    alignItems: 'center',
+    borderColor: '#E2E8F0',
   },
-  boxLabel: {
-    color: '#94a3b8',
-    fontSize: 10,
+  filterChipActive: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#15803D',
   },
-  boxVal: {
-    color: '#ffffff',
-    fontSize: 13,
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  filterChipTextActive: {
+    color: '#15803D',
     fontWeight: '800',
+  },
+  pourCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    gap: 10,
+    elevation: 1,
+  },
+  pourCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  sessionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  dateText: {
+    fontSize: 11,
+    color: '#64748B',
     marginTop: 2,
   },
-  hashRow: {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    borderColor: '#1e293b',
+  payoutBox: {
+    alignItems: 'flex-end',
+  },
+  payoutAmount: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#15803D',
+  },
+  payoutStatus: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#16A34A',
+    marginTop: 1,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 8,
+    borderColor: '#F1F5F9',
+  },
+  mLabel: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  mVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  hashText: {
-    color: '#64748b',
-    fontSize: 10,
-    fontFamily: 'monospace',
-    flex: 1,
-    marginRight: 6,
-  },
-  auditLink: {
-    color: '#34d399',
+  receiptCode: {
     fontSize: 11,
+    color: '#94A3B8',
+  },
+  viewSlipBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  viewSlipText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#15803D',
   },
 });

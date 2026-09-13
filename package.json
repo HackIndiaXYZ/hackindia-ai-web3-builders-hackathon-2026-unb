@@ -14,6 +14,8 @@
     "dev:server": "npm --prefix server run start",
     "dev:ml": "cd ml-service && uvicorn app.main:app --port 8000 --reload",
     "dev:sim": "npm --prefix hardware-sim run start",
+    "dev:mobile": "npm --prefix farmer-mobile-app run start",
+    "dev:mobile:web": "npm --prefix farmer-mobile-app run web",
     "build": "npm --prefix client run build"
   },
   "devDependencies": {

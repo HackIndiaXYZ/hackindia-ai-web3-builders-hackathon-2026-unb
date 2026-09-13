@@ -165,8 +165,8 @@ export default function QCOfficerDesktop() {
                 </span>
                 <span className="text-xs font-mono font-bold">
                   {isExpansionViolated 
-                    ? (isHindi ? '❌ सीमा का उल्लंघन' : '❌ THRESHOLD EXCEEDED') 
-                    : (isHindi ? '✅ स्वीकृत' : '✅ PASSED')}
+                    ? (isHindi ? 'सीमा का उल्लंघन' : 'THRESHOLD EXCEEDED')
+                    : (isHindi ? 'स्वीकृत' : 'PASSED')}
                 </span>
               </div>
               <p className="text-xs opacity-90 leading-snug">
@@ -192,7 +192,7 @@ export default function QCOfficerDesktop() {
                   className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4" />
-                  <span>🔒 {isHindi ? 'बैच संगरोध करें और भुगतान फ्रिज़ करें' : 'QUARANTINE BATCH & FREEZE UPSTREAM PAYOUTS'}</span>
+                  <span>{isHindi ? 'बैच संगरोध करें और भुगतान फ्रिज़ करें' : 'QUARANTINE BATCH & FREEZE UPSTREAM PAYOUTS'}</span>
                 </button>
               ) : (
                 <div className="bg-rose-950/80 border border-rose-500/40 p-3 rounded-xl text-center text-rose-300 text-xs font-bold flex items-center justify-center gap-2">
@@ -240,8 +240,8 @@ export default function QCOfficerDesktop() {
                 </div>
                 <div className="text-xs text-slate-400">
                   {b.anomalyScore >= 80 
-                    ? (isHindi ? '🔴 मात्रा विस्तार उल्लंघन (+6.8%)' : '🔴 Volume expansion violation (+6.8%)')
-                    : (isHindi ? '🟢 सामान्य मापदंड' : '🟢 Nominal parameters')}
+                    ? (isHindi ? 'मात्रा विस्तार उल्लंघन (+6.8%)' : 'Volume expansion violation (+6.8%)')
+                    : (isHindi ? 'सामान्य मापदंड' : 'Nominal parameters')}
                 </div>
                 <button
                   onClick={() => setActiveEvidenceModal({
@@ -348,7 +348,7 @@ export default function QCOfficerDesktop() {
                 <div className="space-y-2 text-center py-4">
                   <Scale className="w-8 h-8 text-amber-400 animate-bounce mx-auto" />
                   <div className="text-white font-bold">{isHindi ? '2. प्रेषण हैश बनाम वेब्रिज हैश क्रॉस-रेफरेंस...' : '2. Cross-Referencing Weighbridge Hash Digest...'}</div>
-                  <div className="text-slate-400 text-[10px] break-all">DISPATCH: sha256:7d2b...9c0b ❌ GATE: sha256:ef44...110a</div>
+                  <div className="text-slate-400 text-[10px] break-all">DISPATCH: sha256:7d2b...9c0b | GATE: sha256:ef44...110a</div>
                 </div>
               )}
 
@@ -363,7 +363,7 @@ export default function QCOfficerDesktop() {
               {quarantineStep >= 4 && (
                 <div className="space-y-3 text-center py-2">
                   <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xl mx-auto">
-                    🚨
+                    <AlertTriangle className="h-6 w-6" />
                   </div>
                   <div className="text-emerald-400 font-extrabold text-sm">{isHindi ? 'संगरोध एवं फ्लाइंग स्क्वाड अलर्ट लॉक!' : 'Batch Quarantined & Raid Warrant Issued!'}</div>
                   <div className="text-slate-300 text-[11px] font-sans">

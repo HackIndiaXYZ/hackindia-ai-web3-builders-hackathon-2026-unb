@@ -62,7 +62,7 @@ export default function EvidenceChainModal() {
               <div>{isHindi ? 'समय-स्टाम्प:' : 'Timestamp:'} <span className="text-white font-bold">{new Date().toISOString()}</span></div>
               <div>{isHindi ? 'नोड आईडी:' : 'Node ID:'} <span className="text-emerald-400 font-bold">{data?.nodeId || "VLC-22"}</span></div>
               <div>{isHindi ? 'NDLM हार्डवेयर टैग:' : 'NDLM Hardware Tag:'} <span className="text-amber-400">AMCU-ESSAE-SN8831</span></div>
-              <div>{isHindi ? 'सत्यापन स्थिति:' : 'Verification Status:'} <span className="text-emerald-400 font-bold">{isHindi ? 'छेड़छाड़-रहित सत्यापित ✅' : 'TAMPER-EVIDENT VERIFIED ✅'}</span></div>
+              <div>{isHindi ? 'सत्यापन स्थिति:' : 'Verification Status:'} <span className="text-emerald-400 font-bold">{isHindi ? 'छेड़छाड़-रहित सत्यापित' : 'TAMPER-EVIDENT VERIFIED'}</span></div>
             </div>
           </div>
 
