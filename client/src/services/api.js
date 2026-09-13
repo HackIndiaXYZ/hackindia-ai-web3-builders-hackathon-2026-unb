@@ -18,12 +18,84 @@ export function submitGrievance(payload) {
   return request('/grievances', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function submitNdlmRegistration(payload) {
+  return request('/ndlm/registrations', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function fetchMilkLogs() {
   return request('/milk/logs', { method: 'GET' });
 }
 
 export function fetchGrievances() {
   return request('/grievances', { method: 'GET' });
+}
+
+export function fetchWorkflowSync() {
+  return request('/sync', { method: 'GET' });
+}
+
+export function createCollectionRequest(payload) {
+  return request('/collection-requests', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateCollectionApproval(requestId, approval, approvedBy) {
+  return request(`/collection-requests/${encodeURIComponent(requestId)}/approval`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approval, approvedBy })
+  });
+}
+
+export function recordCollectionMeasurements(requestId, measurements) {
+  return request(`/collection-requests/${encodeURIComponent(requestId)}/measurements`, {
+    method: 'PATCH',
+    body: JSON.stringify(measurements)
+  });
+}
+
+export function transferCollectionToChilling(requestId, transfer) {
+  return request(`/collection-requests/${encodeURIComponent(requestId)}/transfer`, {
+    method: 'PATCH',
+    body: JSON.stringify(transfer)
+  });
+}
+
+export function updateNdlmRegistration(verificationId, updates) {
+  return request(`/ndlm/registrations/${encodeURIComponent(verificationId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates)
+  });
+}
+
+export function fetchRiskAnomalies(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/admin/risk/anomalies${query ? `?${query}` : ''}`, { method: 'GET' });
+}
+
+export function fetchRiskAggregates(level = 'district', filters = {}) {
+  const query = new URLSearchParams({ level, ...filters }).toString();
+  return request(`/admin/risk/aggregates?${query}`, { method: 'GET' });
+}
+
+export function fetchRaidRecommendations() {
+  return request('/admin/risk/raid-recommendations', { method: 'GET' });
+}
+
+export function reviewRiskAnomaly(anomalyId, decision, reason, officerId) {
+  return request(`/admin/risk/anomalies/${encodeURIComponent(anomalyId)}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ decision, reason, officerId })
+  });
+}
+
+export function approveRaidRecommendation(recommendationId, approval, reason, officerId) {
+  return request(`/admin/risk/raid-recommendations/${encodeURIComponent(recommendationId)}/approval`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approval, reason, officerId })
+  });
+}
+
+export function seedRiskDemo() {
+  return request('/admin/risk/demo/seed', { method: 'POST', body: JSON.stringify({}) });
 }
 
 export { API_BASE_URL };

@@ -156,10 +156,10 @@ export default function AggregatorTablet() {
     confetti({ particleCount: 70 });
   };
 
-  const handleCreateCollectionRequest = () => {
+  const handleCreateCollectionRequest = async () => {
     const farmer = farmers.find(item => item.farmerId === requestFarmerId);
     if (!farmer) return;
-    const request = createCollectionRequest({ farmerId: farmer.farmerId, nodeId: farmer.nodeId, requestedSession: requestSession, requestedAmountKg: requestAmountKg });
+    const request = await createCollectionRequest({ farmerId: farmer.farmerId, nodeId: farmer.nodeId, requestedSession: requestSession, requestedAmountKg: requestAmountKg });
     setRequestNotice(`${request.farmerName} requested for ${request.requestedSession.toLowerCase()} collection at ${request.nodeId}`);
   };
 

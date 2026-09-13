@@ -17,14 +17,14 @@ const allowedOrigins = [...new Set([
 const io = new SocketIOServer(server, {
   cors: {
     origin: allowedOrigins.length ? allowedOrigins : true,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PATCH'],
     credentials: false
   }
 });
 
 app.use(cors({
   origin: allowedOrigins.length ? allowedOrigins : true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Role', 'X-Node-Id']
 }));
 app.use(express.json());
@@ -49,6 +49,10 @@ io.on('connection', (socket) => {
   socket.on('join_jurisdiction', (jurisdiction) => {
     socket.join(`room:${jurisdiction.toLowerCase()}`);
     console.log(`[SOCKET.IO] Client ${socket.id} joined jurisdiction channel room:${jurisdiction.toLowerCase()}`);
+  });
+
+  socket.on('join_farmer', (farmerId) => {
+    if (farmerId) socket.join(`farmer:${String(farmerId)}`);
   });
 
   socket.on('disconnect', () => {

@@ -11,6 +11,7 @@ export default function QCOfficerDesktop() {
     activeJurisdictionConfig,
     setActiveEvidenceModal,
     pourEvents,
+    collectionRequests,
     language
   } = useAnveshana();
 
@@ -66,6 +67,30 @@ export default function QCOfficerDesktop() {
             <span className="text-rose-300">{isHindi ? 'संगरोध:' : 'Quarantined:'} </span>
             <span className="text-rose-400 font-bold">{batches.filter(b => b.batchStatus === 'QUARANTINED').length}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-teal-500/30 bg-teal-500/10 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-teal-200">Cross-device collection review</div>
+            <div className="text-[10px] text-slate-400">Farmer approvals, AMCU readings and chilling transfers received in real time</div>
+          </div>
+          <span className="rounded-full border border-teal-400/40 px-2 py-1 text-[10px] font-bold text-teal-200">{collectionRequests.length} records</span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {collectionRequests.slice(0, 4).map(request => (
+            <div key={request.requestId} className="rounded-xl border border-slate-700 bg-slate-950/70 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <b className="text-white">{request.farmerName}</b>
+                <span className="font-mono text-[10px] text-teal-300">{request.status}</span>
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">{request.requestedAmountKg} kg · {request.nodeId} · {request.requestedSession}</div>
+              {request.aggregatorMeasurements && <div className="mt-2 text-[10px] text-slate-300">AMCU {request.aggregatorMeasurements.weightKg} kg · Fat {request.aggregatorMeasurements.fatPercent}% · SNF {request.aggregatorMeasurements.snfPercent}%</div>}
+              {request.transfer && <div className="mt-1 text-[10px] text-teal-300">Transferred to {request.transfer.destinationNodeId || 'chilling centre'} · seal {request.transfer.sealId}</div>}
+            </div>
+          ))}
+          {collectionRequests.length === 0 && <div className="text-[10px] text-slate-400">No collection workflow records have arrived yet.</div>}
         </div>
       </div>
 

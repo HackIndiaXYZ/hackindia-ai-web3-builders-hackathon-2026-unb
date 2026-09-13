@@ -1,5 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createRealtimeConnection } from '../services/realtime';
+import {
+  createCollectionRequest as createCollectionRequestApi,
+  fetchWorkflowSync,
+  recordCollectionMeasurements,
+  submitNdlmRegistration,
+  transferCollectionToChilling,
+  updateCollectionApproval,
+  updateNdlmRegistration,
+  fetchRiskAnomalies,
+  fetchRiskAggregates,
+  fetchRaidRecommendations,
+  reviewRiskAnomaly as reviewRiskAnomalyApi,
+  approveRaidRecommendation as approveRaidRecommendationApi,
+  seedRiskDemo
+} from '../services/api';
 
 const AnveshanaContext = createContext(null);
 
@@ -319,6 +334,31 @@ const INITIAL_ANOMALIES = [
   { anomalyId: 'ANO-2026-0914', nodeId: 'VLC-ABL-01',     nodeName: 'Mullana Agricultural VLC — Ambala',     riskScore: 83, type: 'GHOST_FARMER_POUR',     details: 'Farmer ID 201410000199 (non-existent in NDLM) poured 42.8 kg across 5 sessions. UPI payout ₹1,926 already triggered. Identity fraud confirmed. Investigation complete.',  timestamp: '2026-08-29T09:20:00Z', status: 'RAID_DISPATCHED'      },
 ];
 
+const INITIAL_RISK_ANOMALIES = [
+  {
+    anomalyId: 'RISK-DEMO-001',
+    observationId: 'OBS-DEMO-001',
+    farmerId: '201410000128',
+    animalId: 'NDLM-840003129940117',
+    farmId: '201410000128',
+    village: 'Siwan',
+    district: 'Kaithal',
+    nodeId: 'VLC-KTL-02',
+    tankerRegistration: 'HR-07-GA-5541',
+    chillingCenterId: 'MCC-KTL-01',
+    type: 'SUSPICIOUS_CONSISTENCY,BREED_DEVIATION',
+    riskScore: 68,
+    provisionalPoints: 68,
+    permanentPoints: 0,
+    status: 'PROVISIONAL',
+    detectedAt: '2026-09-01T07:22:00Z',
+    evidence: [
+      { code: 'SUSPICIOUS_CONSISTENCY', label: 'Fat/SNF consistency check failed', details: 'Fat 3.2% and SNF 7.1% are inconsistent for the registered breed.' },
+      { code: 'PURITY_SUPPORTING_SIGNAL', label: 'Low purity score (supporting signal only)', details: 'Purity 76/100 is only a capped supporting modifier.' }
+    ]
+  }
+];
+
 // Officer Administrative Hierarchy Directory
 export const OFFICER_HIERARCHY = {
   NATIONAL_DIRECTOR: {
@@ -481,6 +521,51 @@ export function AnveshanaProvider({ children }) {
   const [anomalies, setAnomalies] = useState(INITIAL_ANOMALIES);
   const [ndlmVerificationCases, setNdlmVerificationCases] = useState([]);
   const [collectionRequests, setCollectionRequests] = useState([]);
+  const [riskAnomalies, setRiskAnomalies] = useState(INITIAL_RISK_ANOMALIES);
+  const [riskAggregates, setRiskAggregates] = useState([]);
+  const [raidRecommendations, setRaidRecommendations] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchWorkflowSync().then(sync => {
+      if (!active) return;
+      if (Array.isArray(sync.milkLogs) && sync.milkLogs.length) setPourEvents(previous => {
+        const incoming = sync.milkLogs.filter(item => !previous.some(existing => existing.eventId === item.eventId));
+        return incoming.length ? [...incoming, ...previous] : previous;
+      });
+      if (Array.isArray(sync.collectionRequests)) setCollectionRequests(sync.collectionRequests);
+      if (Array.isArray(sync.ndlmRegistrations)) setNdlmVerificationCases(sync.ndlmRegistrations);
+    }).catch(() => {
+      // The dashboards retain their seeded data when the prototype API is offline.
+    });
+    Promise.all([fetchRiskAnomalies(), fetchRiskAggregates('district'), fetchRaidRecommendations()])
+      .then(([anomalyResponse, aggregateResponse, raidResponse]) => {
+        if (!active) return;
+        if (anomalyResponse.anomalies?.length) setRiskAnomalies(anomalyResponse.anomalies);
+        setRiskAggregates(aggregateResponse.aggregates || []);
+        setRaidRecommendations(raidResponse.recommendations || []);
+        if (!anomalyResponse.anomalies?.length) {
+          seedRiskDemo().then(seeded => {
+            if (active && seeded?.anomalies?.length) setRiskAnomalies(seeded.anomalies);
+          }).catch(() => {});
+        }
+      })
+      .catch(async () => {
+        // Seed once when running against a clean prototype server; this keeps
+        // the command centre demonstrable without a database.
+        try {
+          const seeded = await seedRiskDemo();
+          if (seeded?.anomalies) setRiskAnomalies(seeded.anomalies);
+          const aggregates = await fetchRiskAggregates('district');
+          setRiskAggregates(aggregates.aggregates || []);
+          const raids = await fetchRaidRecommendations();
+          setRaidRecommendations(raids.recommendations || []);
+        } catch {
+          // Existing seeded dashboard data remains available if API is offline.
+        }
+      });
+    return () => { active = false; };
+  }, []);
 
   // Audit Log — immutable append-only action trail
   const [auditLog, setAuditLog] = useState([
@@ -542,6 +627,30 @@ export function AnveshanaProvider({ children }) {
     onNdlmRegistrationCreated: (registration) => {
       setNdlmVerificationCases(previous => previous.some(item => item.verificationId === registration.verificationId) ? previous : [registration, ...previous]);
       setLiveIncidents(previous => [{ id: registration.verificationId, time: new Date(registration.submittedAt).toLocaleTimeString(), type: 'INFO', text: `NDLM verification request received for tag ${registration.ndlmTag}` }, ...previous]);
+    },
+    onNdlmRegistrationUpdated: (registration) => {
+      setNdlmVerificationCases(previous => previous.some(item => item.verificationId === registration.verificationId)
+        ? previous.map(item => item.verificationId === registration.verificationId ? registration : item)
+        : [registration, ...previous]);
+    },
+    onCollectionRequestCreated: (request) => {
+      setCollectionRequests(previous => previous.some(item => item.requestId === request.requestId) ? previous : [request, ...previous]);
+    },
+    onCollectionRequestUpdated: (request) => {
+      setCollectionRequests(previous => previous.some(item => item.requestId === request.requestId)
+        ? previous.map(item => item.requestId === request.requestId ? request : item)
+        : [request, ...previous]);
+    },
+    onRiskAnomalyProvisional: (anomaly) => {
+      setRiskAnomalies(previous => previous.some(item => item.anomalyId === anomaly.anomalyId) ? previous : [anomaly, ...previous]);
+    },
+    onRiskAnomalyReviewed: (anomaly) => {
+      setRiskAnomalies(previous => previous.map(item => item.anomalyId === anomaly.anomalyId ? anomaly : item));
+    },
+    onRaidRecommendationUpdated: (recommendation) => {
+      setRaidRecommendations(previous => previous.some(item => item.recommendationId === recommendation.recommendationId)
+        ? previous.map(item => item.recommendationId === recommendation.recommendationId ? recommendation : item)
+        : [recommendation, ...previous]);
     },
     onTelemetryTick: (telemetry) => setLatestTelemetry(telemetry)
   }), []);
@@ -631,56 +740,74 @@ export function AnveshanaProvider({ children }) {
     return fullEvent;
   };
 
-  const createCollectionRequest = ({ farmerId, nodeId, requestedSession, requestedAmountKg }) => {
+  const createCollectionRequest = async ({ farmerId, nodeId, requestedSession, requestedAmountKg }) => {
     const farmer = farmers.find(item => item.farmerId === farmerId);
-    const request = {
-      requestId: `COL-${Date.now()}`,
+    const payload = {
       farmerId,
       farmerName: farmer?.name || 'Unknown farmer',
       nodeId: nodeId || farmer?.nodeId || 'VLC-22',
       district: farmer?.district || 'Karnal',
       state: farmer?.state || 'Haryana',
       requestedSession: requestedSession || (new Date().getHours() < 14 ? 'MORNING' : 'EVENING'),
-      requestedAmountKg: Number(requestedAmountKg) || 0,
+      requestedAmountKg: Number(requestedAmountKg) || 0
+    };
+    const localRequest = {
+      ...payload,
+      requestId: `COL-${Date.now()}`,
       status: 'REQUESTED',
       farmerApproval: 'PENDING',
       aggregatorMeasurements: null,
       createdAt: new Date().toISOString()
     };
-    setCollectionRequests(previous => [request, ...previous]);
-    return request;
+    try {
+      const response = await createCollectionRequestApi(payload);
+      const request = response.collectionRequest;
+      setCollectionRequests(previous => [request, ...previous.filter(item => item.requestId !== request.requestId)]);
+      return request;
+    } catch {
+      setCollectionRequests(previous => [localRequest, ...previous]);
+      return localRequest;
+    }
   };
 
-  const approveCollectionRequest = (requestId, approval = 'APPROVED') => {
-    setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? { ...request, farmerApproval: approval, status: approval === 'APPROVED' ? 'APPROVED_BY_FARMER' : 'DECLINED_BY_FARMER', approvedAt: new Date().toISOString() } : request));
+  const approveCollectionRequest = async (requestId, approval = 'APPROVED') => {
+    try {
+      const response = await updateCollectionApproval(requestId, approval);
+      setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? response.collectionRequest : request));
+    } catch {
+      setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? { ...request, farmerApproval: approval, status: approval === 'APPROVED' ? 'APPROVED_BY_FARMER' : 'DECLINED_BY_FARMER', approvedAt: new Date().toISOString() } : request));
+    }
   };
 
-  const submitAggregatorMeasurements = (requestId, measurements) => {
-    setCollectionRequests(previous => previous.map(request => {
-      if (request.requestId !== requestId) return request;
-      const expectedYieldKg = calculateDynamicYieldBound({ farmer: farmers.find(item => item.farmerId === request.farmerId), pourEvents }).perCowBound;
-      const measuredWeightKg = Number(measurements.weightKg);
-      return {
-        ...request,
-        aggregatorMeasurements: { ...measurements, measuredWeightKg, recordedAt: new Date().toISOString() },
+  const submitAggregatorMeasurements = async (requestId, measurements) => {
+    const request = collectionRequests.find(item => item.requestId === requestId);
+    const expectedYieldKg = calculateDynamicYieldBound({ farmer: farmers.find(item => item.farmerId === request?.farmerId), pourEvents }).perCowBound;
+    try {
+      const response = await recordCollectionMeasurements(requestId, measurements);
+      const updated = { ...response.collectionRequest, expectedYieldKg, comparison: { differenceKg: +(Number(measurements.weightKg) - expectedYieldKg).toFixed(2), withinDynamicBound: Number(measurements.weightKg) <= expectedYieldKg } };
+      setCollectionRequests(previous => previous.map(item => item.requestId === requestId ? updated : item));
+    } catch {
+      setCollectionRequests(previous => previous.map(item => item.requestId === requestId ? {
+        ...item,
+        aggregatorMeasurements: { ...measurements, measuredWeightKg: Number(measurements.weightKg), recordedAt: new Date().toISOString() },
         expectedYieldKg,
-        comparison: { differenceKg: +(measuredWeightKg - expectedYieldKg).toFixed(2), withinDynamicBound: measuredWeightKg <= expectedYieldKg },
+        comparison: { differenceKg: +(Number(measurements.weightKg) - expectedYieldKg).toFixed(2), withinDynamicBound: Number(measurements.weightKg) <= expectedYieldKg },
         status: 'MEASUREMENTS_RECORDED'
-      };
-    }));
+      } : item));
+    }
   };
 
-  const transferToChillingCenter = (requestId, transfer) => {
-    setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? {
-      ...request,
-      transfer: {
-        ...transfer,
-        transferId: `CHILL-${Date.now()}`,
-        destinationType: 'CHILLING_CENTER',
-        transferredAt: new Date().toISOString()
-      },
-      status: 'TRANSFERRED_TO_CHILLING_CENTER'
-    } : request));
+  const transferToChillingCenter = async (requestId, transfer) => {
+    try {
+      const response = await transferCollectionToChilling(requestId, transfer);
+      setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? response.collectionRequest : request));
+    } catch {
+      setCollectionRequests(previous => previous.map(request => request.requestId === requestId ? {
+        ...request,
+        transfer: { ...transfer, transferId: `CHILL-${Date.now()}`, destinationType: 'CHILLING_CENTER', transferredAt: new Date().toISOString() },
+        status: 'TRANSFERRED_TO_CHILLING_CENTER'
+      } : request));
+    }
   };
 
   const markPourPaid = (eventId, paymentReference = `PAY-${Date.now()}`) => {
@@ -693,9 +820,10 @@ export function AnveshanaProvider({ children }) {
     return { eligible: true, reason: 'Eligible for milk collection.' };
   };
 
-  const registerNdlmAnimal = (animal) => {
+  const registerNdlmAnimal = async (animal) => {
     const verificationCase = {
       ...animal,
+      farmerId: animal.farmerId || '201410000123',
       verificationId: `NDLM-VER-${Date.now()}`,
       submittedAt: new Date().toISOString(),
       status: 'PENDING_REVIEW',
@@ -703,13 +831,53 @@ export function AnveshanaProvider({ children }) {
       fieldEvidence: null,
       estimatedYieldKg: calculateDynamicYieldBound({ farmer: { ...animal, registeredCows: 1, animalBreed: animal.breed }, pourEvents }).perCowBound
     };
-    setNdlmVerificationCases(previous => [verificationCase, ...previous]);
+    try {
+      const response = await submitNdlmRegistration({ ...verificationCase, lastVaccinationDate: animal.lastVaccinationDate || animal.vaccinationDate });
+      if (response.registration) Object.assign(verificationCase, response.registration);
+    } catch {
+      // Keep the local submission visible when the prototype API is unavailable.
+    }
+    setNdlmVerificationCases(previous => [verificationCase, ...previous.filter(item => item.verificationId !== verificationCase.verificationId)]);
     setLiveIncidents(previous => [{ id: verificationCase.verificationId, time: new Date().toLocaleTimeString(), type: 'INFO', text: `NDLM animal registration received for ${animal.animalName || animal.ndlmTag}` }, ...previous]);
     return verificationCase;
   };
 
-  const updateNdlmVerification = (verificationId, updates) => {
-    setNdlmVerificationCases(previous => previous.map(item => item.verificationId === verificationId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item));
+  const updateNdlmVerification = async (verificationId, updates) => {
+    try {
+      const response = await updateNdlmRegistration(verificationId, updates);
+      setNdlmVerificationCases(previous => previous.map(item => item.verificationId === verificationId ? response.registration : item));
+    } catch {
+      setNdlmVerificationCases(previous => previous.map(item => item.verificationId === verificationId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item));
+    }
+  };
+
+  const reviewRiskAnomaly = async (anomalyId, decision, reason) => {
+    try {
+      const response = await reviewRiskAnomalyApi(anomalyId, decision, reason, 'FSSAI-HR-007');
+      setRiskAnomalies(previous => previous.map(item => item.anomalyId === anomalyId ? response.anomaly : item));
+      const aggregateResponse = await fetchRiskAggregates('district');
+      setRiskAggregates(aggregateResponse.aggregates || []);
+      return response.anomaly;
+    } catch {
+      setRiskAnomalies(previous => previous.map(item => item.anomalyId === anomalyId ? {
+        ...item,
+        status: decision === 'CONFIRM' ? 'CONFIRMED' : decision === 'CLEAR' ? 'CLEARED_VALID' : 'DISMISSED',
+        permanentPoints: decision === 'CONFIRM' ? item.provisionalPoints : 0,
+        review: { decision, reason, officerId: 'FSSAI-HR-007', reviewedAt: new Date().toISOString() }
+      } : item));
+      return null;
+    }
+  };
+
+  const approveRaidRecommendation = async (recommendationId, approval, reason = '') => {
+    try {
+      const response = await approveRaidRecommendationApi(recommendationId, approval, reason, 'FSSAI-HR-007');
+      setRaidRecommendations(previous => previous.map(item => item.recommendationId === recommendationId ? response.recommendation : item));
+      return response.recommendation;
+    } catch {
+      setRaidRecommendations(previous => previous.map(item => item.recommendationId === recommendationId ? { ...item, status: approval } : item));
+      return null;
+    }
   };
 
   const quarantineBatch = (batchId) => {
@@ -816,6 +984,11 @@ export function AnveshanaProvider({ children }) {
       quarantineBatch,
       acceptBatch,
       anomalies,
+      riskAnomalies,
+      riskAggregates,
+      raidRecommendations,
+      reviewRiskAnomaly,
+      approveRaidRecommendation,
       dispatchRaid,
       liveIncidents,
       injectVolumeAnomalySimulation,

@@ -22,16 +22,15 @@ import CattleScreen from './src/screens/CattleScreen';
 import KccLoanScreen from './src/screens/KccLoanScreen';
 import AmcuSyncScreen from './src/screens/AmcuSyncScreen';
 import CalculatorScreen from './src/screens/CalculatorScreen';
-import { logMilkDeposit, submitGrievance, submitNdlmRegistration } from './src/services/api';
+import { fetchCollectionRequests, logMilkDeposit, submitGrievance, submitNdlmRegistration, updateCollectionApproval } from './src/services/api';
 import { createMobileRealtimeConnection } from './src/services/realtime';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'POURS' | 'CATTLE' | 'KCC' | 'AMCU' | 'CALC'
   const [language, setLanguage] = useState('hi-IN'); 
+  const isHindi = language === 'hi-IN';
 
   const { t } = useTranslation(language);
-
-  React.useEffect(() => createMobileRealtimeConnection(), []);
 
   React.useEffect(() => {
     (async () => {
@@ -66,6 +65,36 @@ export default function App() {
     bankAccount: 'SBI खाता **4012',
     purityScore: 87
   });
+  const [collectionRequests, setCollectionRequests] = useState([]);
+  const [realtimeStatus, setRealtimeStatus] = useState('connecting');
+
+  const mergeCollectionRequest = React.useCallback((request) => {
+    if (!request || request.farmerId !== farmer.farmerId) return;
+    setCollectionRequests(previous => previous.some(item => item.requestId === request.requestId)
+      ? previous.map(item => item.requestId === request.requestId ? request : item)
+      : [request, ...previous]);
+  }, [farmer.farmerId]);
+
+  React.useEffect(() => {
+    fetchCollectionRequests(farmer.farmerId)
+      .then(response => setCollectionRequests(response.collectionRequests || []))
+      .catch(() => null);
+    return createMobileRealtimeConnection({
+      farmerId: farmer.farmerId,
+      onStatusChange: setRealtimeStatus,
+      onCollectionRequestCreated: mergeCollectionRequest,
+      onCollectionRequestUpdated: mergeCollectionRequest
+    });
+  }, [farmer.farmerId, mergeCollectionRequest]);
+
+  const handleCollectionApproval = async (requestId, approval) => {
+    try {
+      const response = await updateCollectionApproval(requestId, approval);
+      mergeCollectionRequest(response.collectionRequest);
+    } catch (error) {
+      Alert.alert(isHindi ? 'अपडेट असफल' : 'Update failed', error.message);
+    }
+  };
 
   // Cattle Data List
   const [cattleList, setCattleList] = useState([
@@ -365,6 +394,9 @@ export default function App() {
               onOpenKcc={() => setShowKccModal(true)}
               onOpenCalculator={() => setActiveTab('CALC')}
               onViewReceipt={(receipt) => setSelectedReceipt(receipt)}
+              collectionRequests={collectionRequests}
+              realtimeStatus={realtimeStatus}
+              onCollectionApproval={handleCollectionApproval}
             />
           )}
 

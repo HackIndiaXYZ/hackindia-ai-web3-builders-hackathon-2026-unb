@@ -22,4 +22,15 @@ export function submitNdlmRegistration(payload) {
   return request('/ndlm/registrations', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function fetchCollectionRequests(farmerId) {
+  return request(`/collection-requests?farmerId=${encodeURIComponent(farmerId)}`, { method: 'GET' });
+}
+
+export function updateCollectionApproval(requestId, approval) {
+  return request(`/collection-requests/${encodeURIComponent(requestId)}/approval`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approval, approvedBy: 'FARMER_MOBILE' })
+  });
+}
+
 export { API_BASE_URL };

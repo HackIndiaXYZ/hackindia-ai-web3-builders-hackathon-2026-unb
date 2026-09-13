@@ -9,6 +9,12 @@ export function createRealtimeConnection({
   onMilkLogged,
   onGrievanceCreated,
   onNdlmRegistrationCreated,
+  onNdlmRegistrationUpdated,
+  onCollectionRequestCreated,
+  onCollectionRequestUpdated,
+  onRiskAnomalyProvisional,
+  onRiskAnomalyReviewed,
+  onRaidRecommendationUpdated,
   onTelemetryTick
 }) {
   const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -27,6 +33,14 @@ export function createRealtimeConnection({
   socket.on('milk_logged', onMilkLogged);
   socket.on('grievance_created', onGrievanceCreated);
   socket.on('ndlm_registration_created', onNdlmRegistrationCreated);
+  socket.on('ndlm_registration_updated', onNdlmRegistrationUpdated);
+  socket.on('ndlm_registration_reviewed', onNdlmRegistrationUpdated);
+  socket.on('collection_request_created', onCollectionRequestCreated);
+  socket.on('collection_request_updated', onCollectionRequestUpdated);
+  socket.on('risk_anomaly_provisional', onRiskAnomalyProvisional);
+  socket.on('risk_anomaly_reviewed', onRiskAnomalyReviewed);
+  socket.on('raid_recommendation_created', onRaidRecommendationUpdated);
+  socket.on('raid_recommendation_updated', onRaidRecommendationUpdated);
   socket.on('telemetry_tick', onTelemetryTick);
 
   return () => socket.disconnect();
