@@ -1,4 +1,8 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://hackindia-ai-web3-builders-hackathon-i3ff.onrender.com/api/v1').replace(/\/$/, '');
+const PRODUCTION_API_BASE_URL = 'https://hackindia-ai-web3-builders-hackathon-i3ff.onrender.com/api/v1';
+const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim();
+const API_BASE_URL = (/^https?:\/\/[^/\s]+\/api\/v1$/i.test(configuredApiBaseUrl)
+  ? configuredApiBaseUrl
+  : PRODUCTION_API_BASE_URL).replace(/\/$/, '');
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
