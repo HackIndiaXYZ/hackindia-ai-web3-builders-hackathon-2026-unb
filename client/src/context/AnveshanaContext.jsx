@@ -22,6 +22,14 @@ import {
 
 const AnveshanaContext = createContext(null);
 
+const DEMO_OFFICERS = [
+  { officerId: 'FSSAI-HR-007', name: 'Anita Mundhe', role: 'FSSAI', title: 'State Food Safety Officer', jurisdiction: 'FSSAI-HR', state: 'Haryana', districts: ['Kaithal', 'Karnal'], availability: 'AVAILABLE', status: 'ON_DUTY', workload: 0, workloadCapacity: 4 },
+  { officerId: 'QCO-MCC104-001', name: 'Harish Chandra', role: 'QC', title: 'Quality Control Inspector', jurisdiction: 'FSSAI-HR', state: 'Haryana', districts: ['Kaithal', 'Hisar'], availability: 'AVAILABLE', status: 'ON_DUTY', workload: 0, workloadCapacity: 3 },
+  { officerId: 'FSSAI-DL-014', name: 'Vikram Bedi', role: 'FSSAI', title: 'Food Safety Officer', jurisdiction: 'FSSAI-DL', state: 'Delhi NCR', districts: ['East Delhi', 'Central Delhi'], availability: 'AVAILABLE', status: 'ON_DUTY', workload: 0, workloadCapacity: 3 },
+  { officerId: 'FSSAI-UP-022', name: 'Nidhi Srivastava', role: 'FSSAI', title: 'District Food Safety Officer', jurisdiction: 'FSSAI-UP', state: 'Uttar Pradesh', districts: ['Mathura', 'Agra'], availability: 'AVAILABLE', status: 'ON_DUTY', workload: 0, workloadCapacity: 3 },
+  { officerId: 'AGG-VLC-22', name: 'Rakesh Yadav', role: 'AGGREGATOR', title: 'Collection Centre Supervisor', jurisdiction: 'FSSAI-HR', state: 'Haryana', districts: ['Karnal', 'Kaithal'], availability: 'AVAILABLE', status: 'ON_DUTY', workload: 0, workloadCapacity: 2 }
+];
+
 export const JURISDICTION_CONFIGS = {
   'FSSAI-DL': {
     state: 'Delhi NCR',
@@ -305,6 +313,74 @@ const INITIAL_POUR_EVENTS = [
   { eventId: 'PE-20260831-012', farmerId: '201410000140', farmerName: 'Rajpal Siwach',      nodeId: 'VLC-FTB-01', timestamp: '2026-08-31T08:45:00Z', weightKg: 11.3, fatPercent: 5.4, snfPercent: 9.8, payoutINR: 508.50, yieldStatus: 'PASS',    receiptHash: 'sha256:d2ad1e2f3a4b5c6d7e8f9a0b1c2d3e4f' },
 ];
 
+// Deterministic synthetic records keep the prototype map useful for demos
+// while making it explicit that these are not live government records.
+const DEMO_FARMER_NAMES = ['Amit Kumar', 'Geeta Rani', 'Mohan Lal', 'Kavita Devi', 'Rohit Saini', 'Neelam Kaur', 'Dinesh Yadav', 'Poonam Sharma', 'Vikas Malik', 'Seema Rathi'];
+const DEMO_BREEDS = ['Murrah Buffalo', 'Sahiwal Cow', 'Gir Cow', 'HF Cross', 'Tharparkar', 'Rathi Cow'];
+const hashNumber = (seed, min, max) => min + ((seed * 9301 + 49297) % 233280) / 233280 * (max - min);
+const COLLECTION_NODES = INITIAL_NODES.filter(node => node.type === 'VLC');
+const GENERATED_FARMERS = Array.from({ length: 120 }, (_, index) => {
+  const node = COLLECTION_NODES[index % COLLECTION_NODES.length];
+  const seed = index + 17;
+  const farmerId = `20141000${String(200 + index).padStart(4, '0')}`;
+  return {
+    farmerId,
+    name: `${DEMO_FARMER_NAMES[index % DEMO_FARMER_NAMES.length]} ${node.district.split(' ')[0]}`,
+    ndlmTag: `84000313${String(299500 + index).padStart(7, '0')}`,
+    animalBreed: DEMO_BREEDS[index % DEMO_BREEDS.length],
+    registeredCows: 2 + (index % 10),
+    district: node.district,
+    state: node.state,
+    nodeId: node.nodeId,
+    village: `${node.district.split(' ')[0]} ${['East', 'West', 'Central', 'Kalan'][index % 4]}`,
+    purityScore: Math.round(hashNumber(seed, 78, 99)),
+    farmAreaAcres: +(hashNumber(seed + 4, 2.5, 18).toFixed(1)),
+    phone: `+91 98${String(10000000 + index * 7919).slice(0, 8)}`,
+    registrationStatus: index % 17 === 0 ? 'FIELD_VERIFICATION_PENDING' : 'VERIFIED'
+  };
+});
+const DEMO_FARMERS = [...INITIAL_FARMERS, ...GENERATED_FARMERS];
+const GENERATED_POUR_EVENTS = Array.from({ length: 360 }, (_, index) => {
+  const farmer = DEMO_FARMERS[index % DEMO_FARMERS.length];
+  const seed = index + 31;
+  const weightKg = +hashNumber(seed, 4.8, 15.8).toFixed(1);
+  const fatPercent = +hashNumber(seed + 2, 3.5, farmer.animalBreed === 'Murrah Buffalo' ? 8.1 : 5.7).toFixed(1);
+  const snfPercent = +hashNumber(seed + 5, 8.1, 9.7).toFixed(1);
+  const flagged = index % 29 === 0 || index % 47 === 0;
+  return {
+    eventId: `PE-DEMO-${String(index + 1).padStart(4, '0')}`,
+    farmerId: farmer.farmerId,
+    farmerName: farmer.name,
+    nodeId: farmer.nodeId,
+    timestamp: new Date(Date.UTC(2026, 8, 13, 5 + (index % 6), index % 60)).toISOString(),
+    weightKg: flagged ? +(weightKg + 6.2).toFixed(1) : weightKg,
+    fatPercent: flagged ? +(fatPercent - 1.1).toFixed(1) : fatPercent,
+    snfPercent: flagged ? +(snfPercent - 0.8).toFixed(1) : snfPercent,
+    payoutINR: +(weightKg * 45).toFixed(2),
+    yieldStatus: flagged ? 'FLAG' : 'PASS',
+    source: 'DEMO_DATASET',
+    receiptHash: `sha256:demo${String(index + 1).padStart(56, '0')}`
+  };
+});
+const DEMO_POUR_EVENTS = [...INITIAL_POUR_EVENTS, ...GENERATED_POUR_EVENTS];
+const DEMO_NODES = INITIAL_NODES.map((node, index) => {
+  const nodeFarmers = DEMO_FARMERS.filter(farmer => farmer.nodeId === node.nodeId);
+  const nodeLogs = DEMO_POUR_EVENTS.filter(log => log.nodeId === node.nodeId);
+  return {
+    ...node,
+    demoData: true,
+    operator: node.type === 'VLC' ? 'Village Dairy Cooperative' : node.type === 'MCC' ? 'NDDB / State Dairy Network' : 'Anveshana Compliance Network',
+    contactPhone: `+91 1800 ${String(2100 + index).padStart(4, '0')}`,
+    registeredFarmers: nodeFarmers.length,
+    registeredCattle: nodeFarmers.reduce((total, farmer) => total + farmer.registeredCows, 0),
+    dailyVolumeLitres: Math.round(nodeLogs.reduce((total, log) => total + log.weightKg, 0) * 1.08),
+    storageCapacityLitres: node.type === 'VLC' ? 2500 : node.type === 'MCC' ? 12000 : 30000,
+    currentTemperatureC: +(3.4 + (index % 8) * 0.12).toFixed(1),
+    lastHeartbeatAt: '2026-09-13T10:14:00Z',
+    connectivity: index % 13 === 0 ? 'DEGRADED' : 'ONLINE'
+  };
+});
+
 const INITIAL_BATCHES = [
   { batchId: 'BATCH-20260831-TN401', tankerRegistration: 'HR-07-GA-5541', dispatchNodeId: 'VLC-KNL-01', destinationNodeId: 'MCC-KTL-01',  dispatchVolumeL: 4820, receivedVolumeL: 5147, volumeDeltaPercent: 6.8,  batchStatus: 'IN_TRANSIT',   anomalyScore: 92, temperatureLog: [3.8, 3.9, 4.1, 3.8], dispatchTimestamp: '2026-08-31T07:15:00Z' },
   { batchId: 'BATCH-20260831-TN402', tankerRegistration: 'HR-08-B-9912', dispatchNodeId: 'VLC-KNL-02', destinationNodeId: 'MCC-KNL-01',  dispatchVolumeL: 3200, receivedVolumeL: 3206, volumeDeltaPercent: 0.18, batchStatus: 'ARRIVED',      anomalyScore: 12, temperatureLog: [3.5, 3.6, 3.7, 3.6], dispatchTimestamp: '2026-08-31T07:45:00Z' },
@@ -518,9 +594,9 @@ export function AnveshanaProvider({ children }) {
 
   const [authModalState, setAuthModalState] = useState({ isOpen: false, targetRole: 'QC_OFFICER' });
 
-  const [nodes] = useState(INITIAL_NODES);
-  const [farmers] = useState(INITIAL_FARMERS);
-  const [pourEvents, setPourEvents] = useState(INITIAL_POUR_EVENTS);
+  const [nodes] = useState(DEMO_NODES);
+  const [farmers] = useState(DEMO_FARMERS);
+  const [pourEvents, setPourEvents] = useState(DEMO_POUR_EVENTS);
   const [batches, setBatches] = useState(INITIAL_BATCHES);
   const [anomalies, setAnomalies] = useState(INITIAL_ANOMALIES);
   const [ndlmVerificationCases, setNdlmVerificationCases] = useState([]);
@@ -533,17 +609,26 @@ export function AnveshanaProvider({ children }) {
 
   useEffect(() => {
     let active = true;
-    fetchWorkflowSync().then(sync => {
+    const applyWorkflowSync = (sync) => {
       if (!active) return;
       if (Array.isArray(sync.milkLogs) && sync.milkLogs.length) setPourEvents(previous => {
         const incoming = sync.milkLogs.filter(item => !previous.some(existing => existing.eventId === item.eventId));
         return incoming.length ? [...incoming, ...previous] : previous;
       });
-      if (Array.isArray(sync.collectionRequests)) setCollectionRequests(sync.collectionRequests);
+      if (Array.isArray(sync.collectionRequests)) setCollectionRequests(previous => {
+        const incomingById = new Map(sync.collectionRequests.map(item => [item.requestId, item]));
+        const retained = previous.filter(item => !incomingById.has(item.requestId));
+        return [...sync.collectionRequests, ...retained];
+      });
       if (Array.isArray(sync.ndlmRegistrations)) setNdlmVerificationCases(sync.ndlmRegistrations);
-    }).catch(() => {
+    };
+    const syncWorkflow = () => fetchWorkflowSync().then(applyWorkflowSync).catch(() => {
       // The dashboards retain their seeded data when the prototype API is offline.
     });
+    syncWorkflow();
+    // Socket.IO is the primary live path; polling keeps a demo functional when
+    // a browser, proxy, or cold-start temporarily delays websocket delivery.
+    const syncTimer = window.setInterval(syncWorkflow, 3000);
     Promise.all([fetchRiskAnomalies(), fetchRiskAggregates('district'), fetchRaidRecommendations()])
       .then(([anomalyResponse, aggregateResponse, raidResponse]) => {
         if (!active) return;
@@ -573,14 +658,18 @@ export function AnveshanaProvider({ children }) {
       Promise.all([fetchOfficers(), fetchAssignments()])
         .then(([officerResponse, assignmentResponse]) => {
           if (!active) return;
-          setOfficers(officerResponse.officers || []);
+          setOfficers(officerResponse.officers?.length ? officerResponse.officers : DEMO_OFFICERS);
           setAssignments(assignmentResponse.assignments || []);
         })
         .catch(() => {
-          // Officer dispatch remains available when the backend is offline after
-          // the command centre has loaded its risk snapshot.
+          // Keep a visible demo directory when an older backend has not yet
+          // deployed the officer endpoint.
+          if (active) setOfficers(DEMO_OFFICERS);
         });
-      return () => { active = false; };
+    return () => {
+      active = false;
+      window.clearInterval(syncTimer);
+    };
   }, []);
 
   // Audit Log — immutable append-only action trail
@@ -1017,6 +1106,29 @@ export function AnveshanaProvider({ children }) {
     ]);
   };
 
+  const flagEntity = ({ entityType, entityId, farmer, nodeId, district }) => {
+    const newAnomaly = {
+      anomalyId: `MANUAL-${Date.now()}`,
+      observationId: `FIELD-${Date.now()}`,
+      farmerId: farmer?.farmerId || (entityType === 'FARMER' ? entityId : null),
+      animalId: entityType === 'CATTLE' ? entityId : null,
+      farmId: farmer?.farmerId || null,
+      nodeId: nodeId || farmer?.nodeId || null,
+      district: district || farmer?.district || null,
+      type: entityType === 'CATTLE' ? 'MANUAL_CATTLE_REVIEW' : 'MANUAL_FARMER_REVIEW',
+      riskScore: 60,
+      provisionalPoints: 60,
+      permanentPoints: 0,
+      evidence: [{ code: 'MANUAL_REVIEW', label: `Manually flagged ${entityType.toLowerCase()} for field review`, points: 60, details: 'Created by an FSSAI prototype operator after searching the regional register.' }],
+      status: 'PROVISIONAL',
+      detectedAt: new Date().toISOString(),
+      review: null
+    };
+    setRiskAnomalies(previous => [newAnomaly, ...previous]);
+    setLiveIncidents(previous => [{ id: newAnomaly.anomalyId, time: new Date().toLocaleTimeString(), type: 'HIGH', text: `${entityType} ${entityId} manually flagged for field review` }, ...previous]);
+    return newAnomaly;
+  };
+
   return (
     <AnveshanaContext.Provider value={{
       currentRole,
@@ -1078,6 +1190,7 @@ export function AnveshanaProvider({ children }) {
       dispatchRaid,
       liveIncidents,
       injectVolumeAnomalySimulation,
+      flagEntity,
       auditLog,
       LICENSE_REGISTRY,
       appendAuditEntry

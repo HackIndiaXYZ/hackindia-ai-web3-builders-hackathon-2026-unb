@@ -1,7 +1,11 @@
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from './api';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api\/v1$/, '');
+const PRODUCTION_SOCKET_URL = 'https://hackindia-ai-web3-builders-hackathon-i3ff.onrender.com';
+const configuredSocketUrl = String(import.meta.env.VITE_SOCKET_URL || '').trim();
+const SOCKET_URL = /^https?:\/\/[^/\s]+$/i.test(configuredSocketUrl)
+  ? configuredSocketUrl
+  : (API_BASE_URL.replace(/\/api\/v1$/, '') || PRODUCTION_SOCKET_URL);
 
 export function createRealtimeConnection({
   onConnect,
