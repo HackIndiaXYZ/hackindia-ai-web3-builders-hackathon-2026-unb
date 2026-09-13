@@ -11,6 +11,10 @@ import {
   fetchRiskAnomalies,
   fetchRiskAggregates,
   fetchRaidRecommendations,
+  fetchOfficers,
+  fetchAssignments,
+  assignOfficer as assignOfficerApi,
+  updateAssignment as updateAssignmentApi,
   reviewRiskAnomaly as reviewRiskAnomalyApi,
   approveRaidRecommendation as approveRaidRecommendationApi,
   seedRiskDemo
@@ -524,6 +528,8 @@ export function AnveshanaProvider({ children }) {
   const [riskAnomalies, setRiskAnomalies] = useState(INITIAL_RISK_ANOMALIES);
   const [riskAggregates, setRiskAggregates] = useState([]);
   const [raidRecommendations, setRaidRecommendations] = useState([]);
+  const [officers, setOfficers] = useState([]);
+  const [assignments, setAssignments] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -564,7 +570,17 @@ export function AnveshanaProvider({ children }) {
           // Existing seeded dashboard data remains available if API is offline.
         }
       });
-    return () => { active = false; };
+      Promise.all([fetchOfficers(), fetchAssignments()])
+        .then(([officerResponse, assignmentResponse]) => {
+          if (!active) return;
+          setOfficers(officerResponse.officers || []);
+          setAssignments(assignmentResponse.assignments || []);
+        })
+        .catch(() => {
+          // Officer dispatch remains available when the backend is offline after
+          // the command centre has loaded its risk snapshot.
+        });
+      return () => { active = false; };
   }, []);
 
   // Audit Log — immutable append-only action trail
@@ -651,6 +667,20 @@ export function AnveshanaProvider({ children }) {
       setRaidRecommendations(previous => previous.some(item => item.recommendationId === recommendation.recommendationId)
         ? previous.map(item => item.recommendationId === recommendation.recommendationId ? recommendation : item)
         : [recommendation, ...previous]);
+    },
+    onAssignmentCreated: (assignment) => {
+      setAssignments(previous => previous.some(item => item.assignmentId === assignment.assignmentId)
+        ? previous
+        : [assignment, ...previous]);
+      setOfficers(previous => previous.map(officer => officer.officerId === assignment.officerId
+        ? { ...officer, workload: (officer.workload || 0) + 1, availability: 'BUSY' }
+        : officer));
+    },
+    onAssignmentUpdated: (assignment) => {
+      setAssignments(previous => previous.some(item => item.assignmentId === assignment.assignmentId)
+        ? previous.map(item => item.assignmentId === assignment.assignmentId ? assignment : item)
+        : [assignment, ...previous]);
+      fetchOfficers().then(response => setOfficers(response.officers || [])).catch(() => {});
     },
     onTelemetryTick: (telemetry) => setLatestTelemetry(telemetry)
   }), []);
@@ -880,6 +910,58 @@ export function AnveshanaProvider({ children }) {
     }
   };
 
+  const assignOfficerToTarget = async (payload) => {
+    try {
+      const response = await assignOfficerApi(payload);
+      const assignment = response.assignment;
+      setAssignments(previous => previous.some(item => item.assignmentId === assignment.assignmentId)
+        ? previous.map(item => item.assignmentId === assignment.assignmentId ? assignment : item)
+        : [assignment, ...previous]);
+      const officerResponse = await fetchOfficers();
+      setOfficers(officerResponse.officers || []);
+      return assignment;
+    } catch (error) {
+      if (error.status && error.status < 500) return null;
+      const officer = officers.find(item => item.officerId === payload.officerId);
+      if (!officer) return null;
+      const localAssignment = {
+        assignmentId: `ASGN-${Date.now()}`,
+        officerId: officer.officerId,
+        officerName: officer.name,
+        officerRole: officer.role,
+        officerTitle: officer.title,
+        jurisdiction: officer.jurisdiction,
+        recommendationId: payload.recommendationId || payload.raidRecommendationId || null,
+        targetType: payload.targetType || 'RAID_RECOMMENDATION',
+        targetId: payload.targetId || payload.recommendationId || payload.raidRecommendationId,
+        status: 'ASSIGNED',
+        assignedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setAssignments(previous => [localAssignment, ...previous.filter(item => item.recommendationId !== localAssignment.recommendationId)]);
+      setOfficers(previous => previous.map(item => item.officerId === officer.officerId ? { ...item, workload: (item.workload || 0) + 1, availability: 'BUSY' } : item));
+      return localAssignment;
+    }
+  };
+
+  const updateAssignmentStatus = async (assignmentId, updates) => {
+    try {
+      const response = await updateAssignmentApi(assignmentId, updates);
+      setAssignments(previous => previous.map(item => item.assignmentId === assignmentId ? response.assignment : item));
+      const officerResponse = await fetchOfficers();
+      setOfficers(officerResponse.officers || []);
+      return response.assignment;
+    } catch {
+      let updatedAssignment = null;
+      setAssignments(previous => previous.map(item => {
+        if (item.assignmentId !== assignmentId) return item;
+        updatedAssignment = { ...item, ...updates, updatedAt: new Date().toISOString() };
+        return updatedAssignment;
+      }));
+      return updatedAssignment;
+    }
+  };
+
   const quarantineBatch = (batchId) => {
     setBatches(batches.map(b => b.batchId === batchId ? { ...b, batchStatus: 'QUARANTINED' } : b));
     const incident = {
@@ -987,8 +1069,12 @@ export function AnveshanaProvider({ children }) {
       riskAnomalies,
       riskAggregates,
       raidRecommendations,
+      officers,
+      assignments,
       reviewRiskAnomaly,
       approveRaidRecommendation,
+      assignOfficerToTarget,
+      updateAssignmentStatus,
       dispatchRaid,
       liveIncidents,
       injectVolumeAnomalySimulation,

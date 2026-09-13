@@ -131,10 +131,23 @@ function Sparkline({ data, color = '#f59e0b' }) {
   );
 }
 
-function ExplainableRiskPanel({ riskAnomalies, riskAggregates, raidRecommendations, reviewRiskAnomaly, approveRaidRecommendation }) {
+function ExplainableRiskPanel({
+  riskAnomalies,
+  riskAggregates,
+  raidRecommendations,
+  officers = [],
+  assignments = [],
+  selectedJurisdiction,
+  reviewRiskAnomaly,
+  approveRaidRecommendation,
+  assignOfficerToTarget,
+  updateAssignmentStatus
+}) {
   const [level, setLevel] = useState('district');
   const [selection, setSelection] = useState({});
   const [reviewReason, setReviewReason] = useState('');
+  const [selectedOfficerByRaid, setSelectedOfficerByRaid] = useState({});
+  const [assignmentBusy, setAssignmentBusy] = useState(null);
 
   const levelLabel = { district: 'District', village: 'Village', farm: 'Farm', farmer: 'Farmer', animal: 'Animal' };
   const rows = useMemo(() => {
@@ -181,6 +194,10 @@ function ExplainableRiskPanel({ riskAnomalies, riskAggregates, raidRecommendatio
   };
 
   const pendingRaids = raidRecommendations.filter(item => item.status === 'PENDING_OFFICER_APPROVAL');
+  const displayedRaids = raidRecommendations.slice(0, 12);
+  const availableOfficers = officers.filter(item => item.status !== 'OFF_DUTY' && item.availability !== 'OFFLINE' && (item.workload || 0) < (item.workloadCapacity || 0));
+  const scopedOfficers = availableOfficers.filter(item => !selectedJurisdiction || item.jurisdiction === selectedJurisdiction);
+  const assignmentOfficers = scopedOfficers.length ? scopedOfficers : availableOfficers;
   const confirmedPoints = riskAnomalies.reduce((total, anomaly) => total + (anomaly.permanentPoints || 0), 0);
   const provisionalPoints = riskAnomalies.reduce((total, anomaly) => total + (anomaly.provisionalPoints || 0), 0);
 
@@ -238,14 +255,66 @@ function ExplainableRiskPanel({ riskAnomalies, riskAggregates, raidRecommendatio
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-          <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Raid recommendations</h4><span className="text-[10px] text-rose-300">{pendingRaids.length} require officer approval</span></div>
+          <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Raid recommendations & dispatch</h4><span className="text-[10px] text-rose-300">{pendingRaids.length} require officer approval</span></div>
           <div className="space-y-3">
-            {pendingRaids.length === 0 ? <div className="py-8 text-center text-xs text-slate-500">No pending raid recommendations.</div> : pendingRaids.map(raid => <div key={raid.recommendationId} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+            {displayedRaids.length === 0 ? <div className="py-8 text-center text-xs text-slate-500">No raid recommendations.</div> : displayedRaids.map(raid => {
+              const assignment = assignments.find(item => item.recommendationId === raid.recommendationId);
+              const selectedOfficerId = selectedOfficerByRaid[raid.recommendationId] || assignment?.officerId || '';
+              return <div key={raid.recommendationId} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
               <div className="text-xs font-bold text-white">{raid.targetType}: {raid.targetId}</div>
               <div className="mt-1 text-[10px] text-slate-400">{raid.reason}</div>
+              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/80 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Field officer assignment</span>
+                  {assignment && <span className="rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-mono text-sky-300">{assignment.status} · {assignment.officerName}</span>}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <select
+                    value={selectedOfficerId}
+                    onChange={event => setSelectedOfficerByRaid(previous => ({ ...previous, [raid.recommendationId]: event.target.value }))}
+                    className="min-w-[190px] flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-200 focus:border-amber-400 focus:outline-none"
+                  >
+                    <option value="">Select available officer</option>
+                    {assignmentOfficers.map(officer => <option key={officer.officerId} value={officer.officerId}>{officer.name} · {officer.role} · {officer.workload}/{officer.workloadCapacity}</option>)}
+                  </select>
+                  <button
+                    disabled={!selectedOfficerId || assignmentBusy === raid.recommendationId}
+                    onClick={async () => {
+                      setAssignmentBusy(raid.recommendationId);
+                      await assignOfficerToTarget({ recommendationId: raid.recommendationId, officerId: selectedOfficerId, targetType: 'RAID_RECOMMENDATION', targetId: raid.targetId });
+                      setAssignmentBusy(null);
+                    }}
+                    className="rounded bg-sky-500/20 px-3 py-1.5 text-[10px] font-bold text-sky-300 disabled:opacity-40"
+                  >
+                    {assignmentBusy === raid.recommendationId ? 'Saving…' : assignment ? 'Reassign' : 'Assign officer'}
+                  </button>
+                  {assignment && <select
+                    value={assignment.status}
+                    onChange={event => updateAssignmentStatus(assignment.assignmentId, { status: event.target.value })}
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[10px] text-slate-300 focus:border-amber-400 focus:outline-none"
+                  >
+                    {['ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(status => <option key={status} value={status}>{status}</option>)}
+                  </select>}
+                </div>
+              </div>
               <div className="mt-3 flex gap-2"><button onClick={() => approveRaidRecommendation(raid.recommendationId, 'APPROVED')} className="rounded bg-rose-500/20 px-2 py-1 text-[10px] font-bold text-rose-300">Approve raid</button><button disabled={!reviewReason.trim()} onClick={() => { approveRaidRecommendation(raid.recommendationId, 'DECLINED', reviewReason); setReviewReason(''); }} className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 disabled:opacity-40">Decline with reason</button></div>
-            </div>)}
+            </div>;
+            })}
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div><h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Officer directory</h4><p className="mt-1 text-[10px] text-slate-500">FSSAI, QC and aggregator workforce · live workload from dispatch ledger</p></div>
+          <span className="text-[10px] font-mono text-emerald-300">{availableOfficers.length} on duty</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+          {officers.map(officer => <div key={officer.officerId} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="flex items-start justify-between gap-2"><div><div className="text-xs font-bold text-white">{officer.name}</div><div className="mt-1 text-[10px] text-slate-500">{officer.officerId} · {officer.role}</div></div><span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${officer.availability === 'AVAILABLE' ? 'bg-emerald-500/15 text-emerald-300' : officer.availability === 'BUSY' ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-800 text-slate-500'}`}>{officer.availability}</span></div>
+            <div className="mt-2 text-[10px] text-slate-400">{officer.title} · {officer.jurisdiction}</div>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono"><span className="text-slate-500">{(officer.districts || []).slice(0, 2).join(' · ')}</span><span className="text-sky-300">Load {officer.workload}/{officer.workloadCapacity}</span></div>
+          </div>)}
         </div>
       </div>
     </div>
@@ -262,7 +331,8 @@ export default function GovtAuditorDashboard() {
     language, setActiveEvidenceModal,
     injectVolumeAnomalySimulation,
     auditLog, LICENSE_REGISTRY, batches, ndlmVerificationCases, updateNdlmVerification,
-    riskAnomalies, riskAggregates, raidRecommendations, reviewRiskAnomaly, approveRaidRecommendation,
+    riskAnomalies, riskAggregates, raidRecommendations, officers, assignments,
+    reviewRiskAnomaly, approveRaidRecommendation, assignOfficerToTarget, updateAssignmentStatus,
   } = useAnveshana();
 
   const mapRef         = useRef(null);
@@ -600,8 +670,13 @@ export default function GovtAuditorDashboard() {
           riskAnomalies={riskAnomalies || []}
           riskAggregates={riskAggregates || []}
           raidRecommendations={raidRecommendations || []}
+          officers={officers || []}
+          assignments={assignments || []}
+          selectedJurisdiction={selectedJurisdiction}
           reviewRiskAnomaly={reviewRiskAnomaly}
           approveRaidRecommendation={approveRaidRecommendation}
+          assignOfficerToTarget={assignOfficerToTarget}
+          updateAssignmentStatus={updateAssignmentStatus}
         />
       )}
 
