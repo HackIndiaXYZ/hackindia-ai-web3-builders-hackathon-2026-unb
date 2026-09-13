@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hackindia-ai-web3-builders-hackathon-i3ff.onrender.com/api/v1').replace(/\/$/, '');
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -20,6 +20,17 @@ export function submitGrievance(payload) {
 
 export function submitNdlmRegistration(payload) {
   return request('/ndlm/registrations', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function fetchCollectionRequests(farmerId) {
+  return request(`/collection-requests?farmerId=${encodeURIComponent(farmerId)}`, { method: 'GET' });
+}
+
+export function updateCollectionApproval(requestId, approval) {
+  return request(`/collection-requests/${encodeURIComponent(requestId)}/approval`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approval, approvedBy: 'FARMER_MOBILE' })
+  });
 }
 
 export { API_BASE_URL };

@@ -21,7 +21,10 @@ export default function HomeScreen({
   onAddCattle,
   onOpenKcc,
   onOpenCalculator,
-  onViewReceipt
+  onViewReceipt,
+  collectionRequests = [],
+  realtimeStatus,
+  onCollectionApproval
 }) {
   const { t } = useTranslation(language);
 
@@ -82,6 +85,36 @@ export default function HomeScreen({
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Cross-device aggregator requests */}
+      <View style={styles.requestCard}>
+        <View style={styles.requestHeader}>
+          <View>
+            <Text style={styles.requestTitle}>{language === 'hi-IN' ? 'दूध संग्रह अनुरोध' : 'Milk collection requests'}</Text>
+            <Text style={styles.requestSub}>{realtimeStatus === 'connected' ? 'Live sync active' : 'Syncing with dairy network'}</Text>
+          </View>
+          <Text style={styles.requestCount}>{collectionRequests.filter(request => request.farmerApproval === 'PENDING').length}</Text>
+        </View>
+        {collectionRequests.filter(request => request.farmerApproval === 'PENDING').map(request => (
+          <View key={request.requestId} style={styles.requestRow}>
+            <View style={styles.requestDetails}>
+              <Text style={styles.requestFarmer}>{request.farmerName || 'Aggregator'}</Text>
+              <Text style={styles.requestMeta}>{request.requestedAmountKg} kg · {request.requestedSession} · {request.nodeId}</Text>
+            </View>
+            <View style={styles.requestActions}>
+              <TouchableOpacity style={styles.declineButton} onPress={() => onCollectionApproval(request.requestId, 'DECLINED')}>
+                <Text style={styles.declineText}>{language === 'hi-IN' ? 'मना' : 'Decline'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.approveButton} onPress={() => onCollectionApproval(request.requestId, 'APPROVED')}>
+                <Text style={styles.approveText}>{language === 'hi-IN' ? 'स्वीकार' : 'Approve'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+        {collectionRequests.filter(request => request.farmerApproval === 'PENDING').length === 0 && (
+          <Text style={styles.emptyRequests}>{language === 'hi-IN' ? 'कोई नया अनुरोध नहीं' : 'No pending requests'}</Text>
+        )}
       </View>
 
       {/* 2. Purity Score Card (Clean Light Gauge) */}
@@ -286,6 +319,90 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
+  },
+  requestCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 14,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  requestTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E3A8A',
+  },
+  requestSub: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  requestCount: {
+    minWidth: 26,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 12,
+    textAlign: 'center',
+    backgroundColor: '#2563EB',
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  requestRow: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#DBEAFE',
+    gap: 8,
+  },
+  requestDetails: {
+    flex: 1,
+  },
+  requestFarmer: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  requestMeta: {
+    fontSize: 10,
+    color: '#475569',
+    marginTop: 2,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  approveButton: {
+    backgroundColor: '#15803D',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  approveText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  declineButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FDA4AF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  declineText: {
+    color: '#BE123C',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  emptyRequests: {
+    fontSize: 11,
+    color: '#64748B',
   },
   farmerHeader: {
     flexDirection: 'row',

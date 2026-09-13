@@ -4,8 +4,18 @@ export const store = {
   milkLogs: [],
   grievances: [],
   ndlmRegistrations: [],
+  collectionRequests: [],
+  // Prototype risk ledger. Observations are append-only; a risk point is not
+  // permanent until an officer records a CONFIRM decision.
+  riskObservations: [],
+  riskAnomalies: [],
+  riskReviews: [],
+  raidRecommendations: [],
   batches: [
     { batchId: 'BATCH-20260831-TN401', tankerRegistration: 'HR-07-GA-5541', volumeDeltaPercent: 6.8, batchStatus: 'IN_TRANSIT', anomalyScore: 92 }
+  ],
+  chillingAssociations: [
+    { associationId: 'ASSOC-DEMO-01', tankerRegistration: 'HR-07-GA-5541', chillingCenterId: 'MCC-KTL-01', village: 'Siwan', district: 'Kaithal', firstSeenAt: '2026-08-31T07:15:00Z', observationCount: 3 }
   ]
 };
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { createId, createReceiptHash, store } from '../store.js';
+import { aggregateRisk, ingestRiskObservation, reviewRiskAnomaly, seedRiskDemo } from '../riskSystem.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'anveshana_dpi_protocol_secret_2026';
 
@@ -19,6 +20,17 @@ function validateMilkLog(body) {
     return 'farmerId, weightKg, fatPercent, and snfPercent are required';
   }
   return null;
+}
+
+function emitCollectionUpdate(io, eventName, request) {
+  io.emit(eventName, request);
+  if (request?.farmerId) io.to(`farmer:${request.farmerId}`).emit(eventName, request);
+}
+
+function emitRisk(io, eventName, payload) {
+  io.emit(eventName, payload);
+  if (payload?.farmerId) io.to(`farmer:${payload.farmerId}`).emit(eventName, payload);
+  if (payload?.district) io.to(`room:${String(payload.district).toLowerCase()}`).emit(eventName, payload);
 }
 
 export default function createApiRoutes(io) {
@@ -71,6 +83,19 @@ router.post('/aggregator/pour', (req, res) => {
 
   pourEvents.unshift(pour);
   io.emit('milk_logged', pour);
+  ingestRiskObservation({
+    ...pour,
+    farmId: req.body.farmId,
+    animalId: req.body.animalId,
+    breed: req.body.breed,
+    lactationStage: req.body.lactationStage,
+    purityScore: req.body.purityScore,
+    village: req.body.village,
+    district: req.body.district,
+    state: req.body.state,
+    tankerRegistration: req.body.tankerRegistration,
+    chillingCenterId: req.body.chillingCenterId
+  }, { emit: emitRisk.bind(null, io) });
   res.status(201).json({ success: true, pour });
 });
 
@@ -97,6 +122,19 @@ router.post('/aggregator/pour', (req, res) => {
 
     store.milkLogs.unshift(milkLog);
     io.emit('milk_logged', milkLog);
+    ingestRiskObservation({
+      ...milkLog,
+      animalId: req.body.animalId,
+      farmId: req.body.farmId,
+      breed: req.body.breed,
+      lactationStage: req.body.lactationStage,
+      purityScore: req.body.purityScore,
+      village: req.body.village,
+      district: req.body.district,
+      state: req.body.state,
+      tankerRegistration: req.body.tankerRegistration,
+      chillingCenterId: req.body.chillingCenterId
+    }, { emit: emitRisk.bind(null, io) });
     res.status(201).json({ success: true, milkLog });
   });
 
@@ -149,6 +187,214 @@ router.post('/aggregator/pour', (req, res) => {
 
   router.get('/milk/logs', (req, res) => {
     res.json({ milkLogs: [...store.milkLogs, ...pourEvents] });
+  });
+
+  // Cross-device collection workflow. This is intentionally in-memory for the prototype.
+  router.get('/sync', (req, res) => {
+    res.json({
+      milkLogs: [...store.milkLogs, ...pourEvents],
+      collectionRequests: store.collectionRequests || [],
+      ndlmRegistrations: store.ndlmRegistrations || []
+    });
+  });
+
+  router.get('/collection-requests', (req, res) => {
+    const requests = (store.collectionRequests || []).filter(request => (
+      !req.query.farmerId || request.farmerId === req.query.farmerId
+    ));
+    res.json({ collectionRequests: requests });
+  });
+
+  router.get('/collection-requests/:requestId', (req, res) => {
+    const request = (store.collectionRequests || []).find(item => item.requestId === req.params.requestId);
+    if (!request) return res.status(404).json({ success: false, error: 'Collection request not found' });
+    res.json({ collectionRequest: request });
+  });
+
+  router.post('/collection-requests', (req, res) => {
+    const { farmerId, farmerName, nodeId, district, state, requestedSession, requestedAmountKg } = req.body;
+    const amount = Number(requestedAmountKg);
+    if (!farmerId || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'farmerId and a positive requestedAmountKg are required' });
+    }
+    const request = {
+      requestId: createId('COL'),
+      farmerId,
+      farmerName: farmerName || 'Registered Farmer',
+      nodeId: nodeId || req.user.nodeId || 'VLC-22',
+      district: district || 'Karnal',
+      state: state || 'Haryana',
+      requestedSession: requestedSession || 'MORNING',
+      requestedAmountKg: amount,
+      status: 'REQUESTED',
+      farmerApproval: 'PENDING',
+      aggregatorMeasurements: null,
+      createdAt: new Date().toISOString(),
+      createdBy: req.user.role || 'AGGREGATOR'
+    };
+    store.collectionRequests.unshift(request);
+    emitCollectionUpdate(io, 'collection_request_created', request);
+    res.status(201).json({ success: true, collectionRequest: request });
+  });
+
+  router.patch('/collection-requests/:requestId/approval', (req, res) => {
+    const approval = String(req.body.approval || '').toUpperCase();
+    if (!['APPROVED', 'DECLINED'].includes(approval)) {
+      return res.status(400).json({ success: false, error: 'approval must be APPROVED or DECLINED' });
+    }
+    const request = (store.collectionRequests || []).find(item => item.requestId === req.params.requestId);
+    if (!request) return res.status(404).json({ success: false, error: 'Collection request not found' });
+    request.farmerApproval = approval;
+    request.status = approval === 'APPROVED' ? 'APPROVED_BY_FARMER' : 'DECLINED_BY_FARMER';
+    request.approvedAt = new Date().toISOString();
+    request.approvedBy = req.body.approvedBy || req.user.role || 'FARMER';
+    emitCollectionUpdate(io, 'collection_request_updated', request);
+    emitCollectionUpdate(io, 'collection_request_approved', request);
+    res.json({ success: true, collectionRequest: request });
+  });
+
+  router.patch('/collection-requests/:requestId/measurements', (req, res) => {
+    const request = (store.collectionRequests || []).find(item => item.requestId === req.params.requestId);
+    if (!request) return res.status(404).json({ success: false, error: 'Collection request not found' });
+    if (request.farmerApproval !== 'APPROVED') {
+      return res.status(409).json({ success: false, error: 'Farmer approval is required before recording measurements' });
+    }
+    const weightKg = Number(req.body.weightKg);
+    const fatPercent = Number(req.body.fatPercent);
+    const snfPercent = Number(req.body.snfPercent);
+    if (![weightKg, fatPercent, snfPercent].every(Number.isFinite) || weightKg <= 0) {
+      return res.status(400).json({ success: false, error: 'weightKg, fatPercent, and snfPercent are required' });
+    }
+    request.aggregatorMeasurements = {
+      ...req.body,
+      weightKg,
+      fatPercent,
+      snfPercent,
+      measuredWeightKg: weightKg,
+      recordedAt: new Date().toISOString()
+    };
+    request.status = 'MEASUREMENTS_RECORDED';
+    request.measuredAt = request.aggregatorMeasurements.recordedAt;
+    emitCollectionUpdate(io, 'collection_request_updated', request);
+    emitCollectionUpdate(io, 'collection_measurements_recorded', request);
+    res.json({ success: true, collectionRequest: request });
+  });
+
+  router.patch('/collection-requests/:requestId/transfer', (req, res) => {
+    const request = (store.collectionRequests || []).find(item => item.requestId === req.params.requestId);
+    if (!request) return res.status(404).json({ success: false, error: 'Collection request not found' });
+    if (request.status !== 'MEASUREMENTS_RECORDED') {
+      return res.status(409).json({ success: false, error: 'Measurements must be recorded before transfer' });
+    }
+    request.transfer = {
+      ...req.body,
+      transferId: createId('CHILL'),
+      destinationType: 'CHILLING_CENTER',
+      transferredAt: new Date().toISOString()
+    };
+    request.status = 'TRANSFERRED_TO_CHILLING_CENTER';
+    emitCollectionUpdate(io, 'collection_request_updated', request);
+    emitCollectionUpdate(io, 'collection_transferred', request);
+    res.json({ success: true, collectionRequest: request });
+  });
+
+  router.get('/ndlm/registrations', (req, res) => {
+    res.json({ registrations: store.ndlmRegistrations || [] });
+  });
+
+  router.get('/ndlm/registrations/:verificationId', (req, res) => {
+    const registration = (store.ndlmRegistrations || []).find(item => item.verificationId === req.params.verificationId);
+    if (!registration) return res.status(404).json({ success: false, error: 'NDLM registration not found' });
+    res.json({ registration });
+  });
+
+  // Explainable risk administration. This remains an in-memory prototype, but
+  // the resource shapes are intentionally suitable for a persistent ledger.
+  router.get('/admin/risk/anomalies', (req, res) => {
+    const anomalies = (store.riskAnomalies || []).filter(item => (
+      (!req.query.status || item.status === req.query.status) &&
+      (!req.query.district || item.district === req.query.district) &&
+      (!req.query.village || item.village === req.query.village) &&
+      (!req.query.farmerId || item.farmerId === req.query.farmerId) &&
+      (!req.query.animalId || item.animalId === req.query.animalId)
+    ));
+    res.json({ anomalies, total: anomalies.length, permanentPoints: anomalies.reduce((sum, item) => sum + (item.permanentPoints || 0), 0) });
+  });
+
+  router.get('/admin/risk/observations', (req, res) => {
+    const observations = (store.riskObservations || []).filter(item => (
+      (!req.query.district || item.district === req.query.district) &&
+      (!req.query.farmerId || item.farmerId === req.query.farmerId) &&
+      (!req.query.animalId || item.animalId === req.query.animalId)
+    ));
+    res.json({ observations, total: observations.length });
+  });
+
+  router.post('/admin/risk/observations', (req, res) => {
+    const result = ingestRiskObservation(req.body, { emit: emitRisk.bind(null, io) });
+    res.status(201).json({ success: true, ...result });
+  });
+
+  router.patch('/admin/risk/anomalies/:anomalyId/review', (req, res) => {
+    const anomaly = (store.riskAnomalies || []).find(item => item.anomalyId === req.params.anomalyId);
+    if (!anomaly) return res.status(404).json({ success: false, error: 'Risk anomaly not found' });
+    try {
+      const reviewed = reviewRiskAnomaly(anomaly, {
+        decision: req.body.decision,
+        reason: req.body.reason,
+        officerId: req.body.officerId || req.user.username || req.user.nodeId,
+        officerRole: req.user.role
+      }, { emit: emitRisk.bind(null, io) });
+      res.json({ success: true, anomaly: reviewed });
+    } catch (error) {
+      res.status(error.statusCode || 400).json({ success: false, error: error.message });
+    }
+  });
+
+  router.get('/admin/risk/aggregates', (req, res) => {
+    const level = req.query.level || 'district';
+    res.json({ level, aggregates: aggregateRisk({ ...req.query, level }), generatedAt: new Date().toISOString() });
+  });
+
+  router.get('/admin/risk/associations', (req, res) => {
+    const associations = (store.chillingAssociations || []).filter(item => (
+      (!req.query.tankerRegistration || item.tankerRegistration === req.query.tankerRegistration) &&
+      (!req.query.chillingCenterId || item.chillingCenterId === req.query.chillingCenterId) &&
+      (!req.query.district || item.district === req.query.district)
+    ));
+    res.json({ associations });
+  });
+
+  router.get('/admin/risk/raid-recommendations', (req, res) => {
+    res.json({ recommendations: store.raidRecommendations || [] });
+  });
+
+  router.patch('/admin/risk/raid-recommendations/:recommendationId/approval', (req, res) => {
+    const recommendation = (store.raidRecommendations || []).find(item => item.recommendationId === req.params.recommendationId);
+    if (!recommendation) return res.status(404).json({ success: false, error: 'Raid recommendation not found' });
+    const approval = String(req.body.approval || '').toUpperCase();
+    if (!['APPROVED', 'DECLINED'].includes(approval)) return res.status(400).json({ success: false, error: 'approval must be APPROVED or DECLINED' });
+    if (approval === 'DECLINED' && !String(req.body.reason || '').trim()) return res.status(400).json({ success: false, error: 'A reason is required when declining a raid' });
+    recommendation.status = approval === 'APPROVED' ? 'APPROVED' : 'DECLINED';
+    recommendation.officerApproval = { approval, reason: String(req.body.reason || '').trim(), officerId: req.body.officerId || req.user.username || req.user.nodeId, officerRole: req.user.role, reviewedAt: new Date().toISOString() };
+    emitRisk(io, 'raid_recommendation_updated', recommendation);
+    res.json({ success: true, recommendation });
+  });
+
+  router.post('/admin/risk/demo/seed', (req, res) => {
+    res.json({ success: true, ...seedRiskDemo({ emit: emitRisk.bind(null, io) }) });
+  });
+
+  router.patch('/ndlm/registrations/:verificationId', (req, res) => {
+    const registration = (store.ndlmRegistrations || []).find(item => item.verificationId === req.params.verificationId);
+    if (!registration) return res.status(404).json({ success: false, error: 'NDLM registration not found' });
+    Object.assign(registration, req.body, {
+      updatedAt: new Date().toISOString(),
+      reviewedBy: req.body.reviewedBy || req.user.role || 'FSSAI'
+    });
+    io.emit('ndlm_registration_updated', registration);
+    io.emit('ndlm_registration_reviewed', registration);
+    res.json({ success: true, registration });
   });
 
 // POST /api/v1/qco/quarantine

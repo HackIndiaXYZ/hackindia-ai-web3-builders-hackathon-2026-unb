@@ -131,6 +131,127 @@ function Sparkline({ data, color = '#f59e0b' }) {
   );
 }
 
+function ExplainableRiskPanel({ riskAnomalies, riskAggregates, raidRecommendations, reviewRiskAnomaly, approveRaidRecommendation }) {
+  const [level, setLevel] = useState('district');
+  const [selection, setSelection] = useState({});
+  const [reviewReason, setReviewReason] = useState('');
+
+  const levelLabel = { district: 'District', village: 'Village', farm: 'Farm', farmer: 'Farmer', animal: 'Animal' };
+  const rows = useMemo(() => {
+    const keyFor = item => level === 'animal' ? item.animalId : level === 'farmer' ? item.farmerId : level === 'farm' ? item.farmId : level === 'village' ? item.village : item.district;
+    const scoped = riskAnomalies.filter(item => (
+      (!selection.district || item.district === selection.district) &&
+      (!selection.village || item.village === selection.village) &&
+      (!selection.farmId || item.farmId === selection.farmId) &&
+      (!selection.farmerId || item.farmerId === selection.farmerId)
+    ));
+    const grouped = new Map();
+    scoped.forEach(item => {
+      const key = keyFor(item) || 'UNMAPPED';
+      const row = grouped.get(key) || { key, provisional: 0, permanent: 0, confirmed: 0, provisionalCount: 0, evidence: [], associations: [] };
+      row.provisional += item.provisionalPoints || 0;
+      row.permanent += item.permanentPoints || 0;
+      if (item.status === 'CONFIRMED') row.confirmed += 1;
+      if (item.status === 'PROVISIONAL' || item.status === 'OBSERVED') row.provisionalCount += 1;
+      row.evidence.push(...(item.evidence || []).map(evidence => evidence.label));
+      if (item.tankerRegistration || item.chillingCenterId) row.associations.push(`${item.tankerRegistration || 'tanker ?'} → ${item.chillingCenterId || 'chilling center ?'}`);
+      grouped.set(key, row);
+    });
+    return [...grouped.values()].map(row => ({ ...row, evidence: [...new Set(row.evidence)].slice(0, 3), associations: [...new Set(row.associations)].slice(0, 2) })).sort((a, b) => b.permanent - a.permanent || b.provisional - a.provisional);
+  }, [riskAnomalies, level, selection]);
+
+  const chooseRow = row => {
+    const next = { ...selection };
+    if (level === 'district') next.district = row.key;
+    if (level === 'village') next.village = row.key;
+    if (level === 'farm') next.farmId = row.key;
+    if (level === 'farmer') next.farmerId = row.key;
+    setSelection(next);
+    const nextLevel = { district: 'village', village: 'farm', farm: 'farmer', farmer: 'animal' }[level];
+    if (nextLevel) setLevel(nextLevel);
+  };
+
+  const resetDrill = nextLevel => {
+    setLevel(nextLevel);
+    const next = { ...selection };
+    const keys = ['district', 'village', 'farmId', 'farmerId'];
+    const index = ['district', 'village', 'farm', 'farmer'].indexOf(nextLevel);
+    keys.forEach((key, i) => { if (i >= index) delete next[key]; });
+    setSelection(next);
+  };
+
+  const pendingRaids = raidRecommendations.filter(item => item.status === 'PENDING_OFFICER_APPROVAL');
+  const confirmedPoints = riskAnomalies.reduce((total, anomaly) => total + (anomaly.permanentPoints || 0), 0);
+  const provisionalPoints = riskAnomalies.reduce((total, anomaly) => total + (anomaly.provisionalPoints || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div>
+          <h3 className="text-base font-bold text-white">Explainable anomaly & risk ledger</h3>
+          <p className="text-xs text-slate-400 mt-1">One unusual observation is provisional. Only an officer confirmation moves points into the permanent score.</p>
+        </div>
+        <div className="flex gap-2 text-[10px] font-mono">
+          <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-300">Provisional {provisionalPoints}</span>
+          <span className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-rose-300">Permanent {confirmedPoints}</span>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {Object.keys(levelLabel).map(item => (
+            <button key={item} onClick={() => resetDrill(item)} className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold ${level === item ? 'border-amber-400 bg-amber-500/15 text-amber-300' : 'border-slate-700 text-slate-400'}`}>{levelLabel[item]}</button>
+          ))}
+          {Object.keys(selection).length > 0 && <button onClick={() => { setSelection({}); setLevel('district'); }} className="ml-auto text-[10px] text-slate-500 hover:text-white">Reset drilldown</button>}
+        </div>
+        {rows.length === 0 ? <div className="py-8 text-center text-xs text-slate-500">No observations at this scope.</div> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[11px]">
+              <thead className="border-b border-slate-800 text-[10px] uppercase text-slate-500"><tr><th className="py-2">Scope</th><th>Provisional</th><th>Permanent</th><th>Confirmed</th><th>Signals / associations</th><th /></tr></thead>
+              <tbody className="divide-y divide-slate-900">
+                {rows.map(row => <tr key={row.key}>
+                  <td className="py-3 pr-3 font-mono font-bold text-white">{row.key}</td>
+                  <td className="text-amber-300">{row.provisional}</td>
+                  <td className="text-rose-300">{row.permanent}</td>
+                  <td className="text-slate-300">{row.confirmed}</td>
+                  <td className="max-w-[280px] text-slate-400">{row.evidence.join(' · ') || 'No signal'}{row.associations.length > 0 && <div className="mt-1 text-[10px] text-sky-300">{row.associations.join(' · ')}</div>}</td>
+                  <td className="text-right"><button onClick={() => chooseRow(row)} className="rounded border border-slate-700 px-2 py-1 text-[10px] font-bold text-amber-300 hover:border-amber-400">Drill →</button></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {riskAggregates.length > 0 && <p className="mt-3 text-[10px] text-slate-600">Server aggregate snapshot: {riskAggregates.length} district groups · permanent scores exclude uncleared provisional points.</p>}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+          <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Officer review queue</h4><span className="text-[10px] text-amber-300">{riskAnomalies.filter(item => ['PROVISIONAL', 'OBSERVED'].includes(item.status)).length} provisional</span></div>
+          <input value={reviewReason} onChange={event => setReviewReason(event.target.value)} placeholder="Review reason (required for every decision)" className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none" />
+          <div className="space-y-3 max-h-[420px] overflow-y-auto">
+            {riskAnomalies.slice(0, 12).map(anomaly => <div key={anomaly.anomalyId} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="flex items-start justify-between gap-2"><div><div className="text-xs font-bold text-white">{anomaly.anomalyId} · {anomaly.type}</div><div className="mt-1 text-[10px] text-slate-500">{anomaly.farmerId || anomaly.nodeId || 'unmapped'} · {anomaly.status}</div></div><span className="font-mono text-amber-300">{anomaly.provisionalPoints} pts</span></div>
+              <div className="mt-2 text-[10px] text-slate-400">{(anomaly.evidence || []).map(item => item.details).join(' ') || 'No explainable signal recorded.'}</div>
+              {anomaly.status === 'PROVISIONAL' || anomaly.status === 'OBSERVED' ? <div className="mt-3 flex gap-2"><button disabled={!reviewReason.trim()} onClick={() => { reviewRiskAnomaly(anomaly.anomalyId, 'CONFIRM', reviewReason); setReviewReason(''); }} className="rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-bold text-emerald-300 disabled:opacity-40">Confirm</button><button disabled={!reviewReason.trim()} onClick={() => { reviewRiskAnomaly(anomaly.anomalyId, 'CLEAR', reviewReason); setReviewReason(''); }} className="rounded bg-sky-500/15 px-2 py-1 text-[10px] font-bold text-sky-300 disabled:opacity-40">Clear valid</button><button disabled={!reviewReason.trim()} onClick={() => { reviewRiskAnomaly(anomaly.anomalyId, 'DISMISS', reviewReason); setReviewReason(''); }} className="rounded bg-rose-500/15 px-2 py-1 text-[10px] font-bold text-rose-300 disabled:opacity-40">Dismiss</button></div> : <div className="mt-2 text-[10px] text-emerald-300">Reviewed: {anomaly.review?.reason || 'reason recorded'}</div>}
+            </div>)}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+          <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Raid recommendations</h4><span className="text-[10px] text-rose-300">{pendingRaids.length} require officer approval</span></div>
+          <div className="space-y-3">
+            {pendingRaids.length === 0 ? <div className="py-8 text-center text-xs text-slate-500">No pending raid recommendations.</div> : pendingRaids.map(raid => <div key={raid.recommendationId} className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+              <div className="text-xs font-bold text-white">{raid.targetType}: {raid.targetId}</div>
+              <div className="mt-1 text-[10px] text-slate-400">{raid.reason}</div>
+              <div className="mt-3 flex gap-2"><button onClick={() => approveRaidRecommendation(raid.recommendationId, 'APPROVED')} className="rounded bg-rose-500/20 px-2 py-1 text-[10px] font-bold text-rose-300">Approve raid</button><button disabled={!reviewReason.trim()} onClick={() => { approveRaidRecommendation(raid.recommendationId, 'DECLINED', reviewReason); setReviewReason(''); }} className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 disabled:opacity-40">Decline with reason</button></div>
+            </div>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function GovtAuditorDashboard() {
   const {
@@ -141,6 +262,7 @@ export default function GovtAuditorDashboard() {
     language, setActiveEvidenceModal,
     injectVolumeAnomalySimulation,
     auditLog, LICENSE_REGISTRY, batches, ndlmVerificationCases, updateNdlmVerification,
+    riskAnomalies, riskAggregates, raidRecommendations, reviewRiskAnomaly, approveRaidRecommendation,
   } = useAnveshana();
 
   const mapRef         = useRef(null);
@@ -469,8 +591,19 @@ export default function GovtAuditorDashboard() {
           <TabBtn label="Analytics"        icon={BarChart2}   active={activeTab === 'ANALYTICS'}  onClick={() => setActiveTab('ANALYTICS')}  />
           <TabBtn label="Registry & Audit" icon={ClipboardList} active={activeTab === 'AUDIT'}   onClick={() => setActiveTab('AUDIT')}      />
           <TabBtn label="NDLM Verification" icon={ClipboardCheck} active={activeTab === 'VERIFICATION'} onClick={() => setActiveTab('VERIFICATION')} />
+          <TabBtn label="Risk Control"     icon={ShieldAlert} active={activeTab === 'RISK'} onClick={() => setActiveTab('RISK')} />
         </div>
       </div>
+
+      {activeTab === 'RISK' && (
+        <ExplainableRiskPanel
+          riskAnomalies={riskAnomalies || []}
+          riskAggregates={riskAggregates || []}
+          raidRecommendations={raidRecommendations || []}
+          reviewRiskAnomaly={reviewRiskAnomaly}
+          approveRaidRecommendation={approveRaidRecommendation}
+        />
+      )}
 
       {activeTab === 'VERIFICATION' && (
         <div className="space-y-5">

@@ -9,18 +9,22 @@ import { authenticateToken } from './middleware/authMiddleware.js';
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+const configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+const allowedOrigins = [...new Set([
+  ...configuredOrigins,
+  'https://hackindia-ai-web3-builders-hackatho-ivory.vercel.app'
+])];
 const io = new SocketIOServer(server, {
   cors: {
     origin: allowedOrigins.length ? allowedOrigins : true,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PATCH'],
     credentials: false
   }
 });
 
 app.use(cors({
   origin: allowedOrigins.length ? allowedOrigins : true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Role', 'X-Node-Id']
 }));
 app.use(express.json());
@@ -45,6 +49,10 @@ io.on('connection', (socket) => {
   socket.on('join_jurisdiction', (jurisdiction) => {
     socket.join(`room:${jurisdiction.toLowerCase()}`);
     console.log(`[SOCKET.IO] Client ${socket.id} joined jurisdiction channel room:${jurisdiction.toLowerCase()}`);
+  });
+
+  socket.on('join_farmer', (farmerId) => {
+    if (farmerId) socket.join(`farmer:${String(farmerId)}`);
   });
 
   socket.on('disconnect', () => {
