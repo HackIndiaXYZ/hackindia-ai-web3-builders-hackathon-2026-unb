@@ -609,17 +609,26 @@ export function AnveshanaProvider({ children }) {
 
   useEffect(() => {
     let active = true;
-    fetchWorkflowSync().then(sync => {
+    const applyWorkflowSync = (sync) => {
       if (!active) return;
       if (Array.isArray(sync.milkLogs) && sync.milkLogs.length) setPourEvents(previous => {
         const incoming = sync.milkLogs.filter(item => !previous.some(existing => existing.eventId === item.eventId));
         return incoming.length ? [...incoming, ...previous] : previous;
       });
-      if (Array.isArray(sync.collectionRequests)) setCollectionRequests(sync.collectionRequests);
+      if (Array.isArray(sync.collectionRequests)) setCollectionRequests(previous => {
+        const incomingById = new Map(sync.collectionRequests.map(item => [item.requestId, item]));
+        const retained = previous.filter(item => !incomingById.has(item.requestId));
+        return [...sync.collectionRequests, ...retained];
+      });
       if (Array.isArray(sync.ndlmRegistrations)) setNdlmVerificationCases(sync.ndlmRegistrations);
-    }).catch(() => {
+    };
+    const syncWorkflow = () => fetchWorkflowSync().then(applyWorkflowSync).catch(() => {
       // The dashboards retain their seeded data when the prototype API is offline.
     });
+    syncWorkflow();
+    // Socket.IO is the primary live path; polling keeps a demo functional when
+    // a browser, proxy, or cold-start temporarily delays websocket delivery.
+    const syncTimer = window.setInterval(syncWorkflow, 3000);
     Promise.all([fetchRiskAnomalies(), fetchRiskAggregates('district'), fetchRaidRecommendations()])
       .then(([anomalyResponse, aggregateResponse, raidResponse]) => {
         if (!active) return;
@@ -657,7 +666,10 @@ export function AnveshanaProvider({ children }) {
           // deployed the officer endpoint.
           if (active) setOfficers(DEMO_OFFICERS);
         });
-      return () => { active = false; };
+    return () => {
+      active = false;
+      window.clearInterval(syncTimer);
+    };
   }, []);
 
   // Audit Log — immutable append-only action trail
