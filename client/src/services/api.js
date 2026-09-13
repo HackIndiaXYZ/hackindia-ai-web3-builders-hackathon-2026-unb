@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://hackindia-ai-web3-builders-hackathon-i3ff.onrender.com/api/v1').replace(/\/$/, '');
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -16,6 +16,14 @@ export function logMilkDeposit(payload) {
 
 export function submitGrievance(payload) {
   return request('/grievances', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function fetchMilkLogs() {
+  return request('/milk/logs', { method: 'GET' });
+}
+
+export function fetchGrievances() {
+  return request('/grievances', { method: 'GET' });
 }
 
 export { API_BASE_URL };

@@ -3,8 +3,26 @@ import { API_BASE_URL } from './api';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api\/v1$/, '');
 
-export function createRealtimeConnection({ onMilkLogged, onGrievanceCreated, onNdlmRegistrationCreated, onTelemetryTick }) {
+export function createRealtimeConnection({
+  onConnect,
+  onDisconnect,
+  onMilkLogged,
+  onGrievanceCreated,
+  onNdlmRegistrationCreated,
+  onTelemetryTick
+}) {
   const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    if (onConnect) onConnect(socket);
+  });
+
+  socket.on('disconnect', () => {
+    if (onDisconnect) onDisconnect();
+  });
+  socket.on('connect_error', () => {
+    if (onDisconnect) onDisconnect();
+  });
 
   socket.on('milk_logged', onMilkLogged);
   socket.on('grievance_created', onGrievanceCreated);

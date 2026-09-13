@@ -9,7 +9,11 @@ import { authenticateToken } from './middleware/authMiddleware.js';
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+const configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+const allowedOrigins = [...new Set([
+  ...configuredOrigins,
+  'https://hackindia-ai-web3-builders-hackatho-ivory.vercel.app'
+])];
 const io = new SocketIOServer(server, {
   cors: {
     origin: allowedOrigins.length ? allowedOrigins : true,

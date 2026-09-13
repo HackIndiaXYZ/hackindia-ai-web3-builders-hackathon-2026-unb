@@ -452,6 +452,8 @@ export function AnveshanaProvider({ children }) {
   const [activeOfficerLevel, setActiveOfficerLevel] = useState('STATE_COMMISSIONER'); // 'NATIONAL_DIRECTOR' | 'STATE_COMMISSIONER' | 'DISTRICT_MAGISTRATE' | 'FOOD_SAFETY_OFFICER'
   const [language, setLanguage] = useState('EN'); // 'EN' | 'HI'
   const [isOnline, setIsOnline] = useState(true);
+  const [realtimeStatus, setRealtimeStatus] = useState('connecting');
+  const [latestTelemetry, setLatestTelemetry] = useState(null);
   const [activeEvidenceModal, setActiveEvidenceModal] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('anveshana-theme') || 'light');
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('anveshana-font-scale') || 'normal');
@@ -510,6 +512,14 @@ export function AnveshanaProvider({ children }) {
   ]);
 
   useEffect(() => createRealtimeConnection({
+    onConnect: () => {
+      setRealtimeStatus('connected');
+      setIsOnline(true);
+    },
+    onDisconnect: () => {
+      setRealtimeStatus('disconnected');
+      setIsOnline(false);
+    },
     onMilkLogged: (milkLog) => {
       setPourEvents(previous => previous.some(event => event.eventId === milkLog.eventId)
         ? previous
@@ -532,7 +542,8 @@ export function AnveshanaProvider({ children }) {
     onNdlmRegistrationCreated: (registration) => {
       setNdlmVerificationCases(previous => previous.some(item => item.verificationId === registration.verificationId) ? previous : [registration, ...previous]);
       setLiveIncidents(previous => [{ id: registration.verificationId, time: new Date(registration.submittedAt).toLocaleTimeString(), type: 'INFO', text: `NDLM verification request received for tag ${registration.ndlmTag}` }, ...previous]);
-    }
+    },
+    onTelemetryTick: (telemetry) => setLatestTelemetry(telemetry)
   }), []);
 
   const activeJurisdictionConfig = JURISDICTION_CONFIGS[selectedJurisdiction] || JURISDICTION_CONFIGS['FSSAI-HR'];
@@ -783,6 +794,8 @@ export function AnveshanaProvider({ children }) {
       setFontScale,
       isOnline,
       setIsOnline,
+      realtimeStatus,
+      latestTelemetry,
       activeEvidenceModal,
       setActiveEvidenceModal,
       nodes,

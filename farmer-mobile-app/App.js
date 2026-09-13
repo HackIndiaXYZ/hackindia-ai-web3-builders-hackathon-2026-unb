@@ -23,12 +23,15 @@ import KccLoanScreen from './src/screens/KccLoanScreen';
 import AmcuSyncScreen from './src/screens/AmcuSyncScreen';
 import CalculatorScreen from './src/screens/CalculatorScreen';
 import { logMilkDeposit, submitGrievance, submitNdlmRegistration } from './src/services/api';
+import { createMobileRealtimeConnection } from './src/services/realtime';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'POURS' | 'CATTLE' | 'KCC' | 'AMCU' | 'CALC'
   const [language, setLanguage] = useState('hi-IN'); 
 
   const { t } = useTranslation(language);
+
+  React.useEffect(() => createMobileRealtimeConnection(), []);
 
   React.useEffect(() => {
     (async () => {
