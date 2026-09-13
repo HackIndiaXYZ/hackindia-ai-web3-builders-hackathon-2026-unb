@@ -6,7 +6,11 @@ async function request(path, options = {}) {
     ...options
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || body.message || `Request failed with ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(body.error || body.message || `Request failed with ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
 
@@ -91,6 +95,27 @@ export function approveRaidRecommendation(recommendationId, approval, reason, of
   return request(`/admin/risk/raid-recommendations/${encodeURIComponent(recommendationId)}/approval`, {
     method: 'PATCH',
     body: JSON.stringify({ approval, reason, officerId })
+  });
+}
+
+export function fetchOfficers(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/admin/officers${query ? `?${query}` : ''}`, { method: 'GET' });
+}
+
+export function fetchAssignments(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/admin/assignments${query ? `?${query}` : ''}`, { method: 'GET' });
+}
+
+export function assignOfficer(payload) {
+  return request('/admin/assignments', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateAssignment(assignmentId, updates) {
+  return request(`/admin/assignments/${encodeURIComponent(assignmentId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates)
   });
 }
 

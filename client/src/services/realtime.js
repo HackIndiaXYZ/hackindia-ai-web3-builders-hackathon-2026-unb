@@ -15,6 +15,8 @@ export function createRealtimeConnection({
   onRiskAnomalyProvisional,
   onRiskAnomalyReviewed,
   onRaidRecommendationUpdated,
+  onAssignmentCreated,
+  onAssignmentUpdated,
   onTelemetryTick
 }) {
   const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -41,6 +43,8 @@ export function createRealtimeConnection({
   socket.on('risk_anomaly_reviewed', onRiskAnomalyReviewed);
   socket.on('raid_recommendation_created', onRaidRecommendationUpdated);
   socket.on('raid_recommendation_updated', onRaidRecommendationUpdated);
+  socket.on('assignment_created', onAssignmentCreated);
+  socket.on('assignment_updated', onAssignmentUpdated);
   socket.on('telemetry_tick', onTelemetryTick);
 
   return () => socket.disconnect();

@@ -33,6 +33,30 @@ function emitRisk(io, eventName, payload) {
   if (payload?.district) io.to(`room:${String(payload.district).toLowerCase()}`).emit(eventName, payload);
 }
 
+const ACTIVE_ASSIGNMENT_STATUSES = new Set(['ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'IN_PROGRESS']);
+const ASSIGNMENT_STATUSES = new Set([...ACTIVE_ASSIGNMENT_STATUSES, 'COMPLETED', 'CANCELLED', 'DECLINED']);
+
+function refreshOfficerWorkload(officerId) {
+  const officer = store.officers.find(item => item.officerId === officerId);
+  if (!officer) return null;
+  officer.workload = store.assignments.filter(item => item.officerId === officerId && ACTIVE_ASSIGNMENT_STATUSES.has(item.status)).length;
+  if (officer.status !== 'OFF_DUTY' && officer.availability !== 'OFFLINE') {
+    officer.availability = officer.workload >= officer.workloadCapacity ? 'BUSY' : 'AVAILABLE';
+  }
+  return officer;
+}
+
+function assignmentJurisdiction(assignment) {
+  const officer = store.officers.find(item => item.officerId === assignment.officerId);
+  return assignment.jurisdiction || officer?.jurisdiction || null;
+}
+
+function emitAssignment(io, eventName, assignment) {
+  io.emit(eventName, assignment);
+  const jurisdiction = assignmentJurisdiction(assignment);
+  if (jurisdiction) io.to(`room:${String(jurisdiction).toLowerCase()}`).emit(eventName, assignment);
+}
+
 export default function createApiRoutes(io) {
   const router = express.Router();
 
@@ -367,6 +391,134 @@ router.post('/aggregator/pour', (req, res) => {
 
   router.get('/admin/risk/raid-recommendations', (req, res) => {
     res.json({ recommendations: store.raidRecommendations || [] });
+  });
+
+  // Officer directory and dispatch ledger are intentionally in-memory for the
+  // prototype. A recommendation can have one active assignment at a time.
+  router.get('/admin/officers', (req, res) => {
+    (store.officers || []).forEach(officer => refreshOfficerWorkload(officer.officerId));
+    const officers = (store.officers || []).filter(officer => (
+      (!req.query.jurisdiction || officer.jurisdiction === req.query.jurisdiction) &&
+      (!req.query.role || officer.role === String(req.query.role).toUpperCase()) &&
+      (!req.query.availability || officer.availability === String(req.query.availability).toUpperCase())
+    )).map(officer => ({ ...officer }));
+    res.json({ officers, total: officers.length });
+  });
+
+  router.get('/admin/assignments', (req, res) => {
+    const assignments = (store.assignments || []).filter(assignment => (
+      (!req.query.officerId || assignment.officerId === req.query.officerId) &&
+      (!req.query.status || assignment.status === String(req.query.status).toUpperCase()) &&
+      (!req.query.recommendationId || assignment.recommendationId === req.query.recommendationId)
+    ));
+    res.json({ assignments, total: assignments.length });
+  });
+
+  router.post('/admin/assignments', (req, res) => {
+    const officerId = String(req.body.officerId || '').trim();
+    const recommendationId = String(req.body.raidRecommendationId || req.body.recommendationId || '').trim() || null;
+    const target = req.body.target || {};
+    const targetType = String(req.body.targetType || target.type || (recommendationId ? 'RAID_RECOMMENDATION' : '')).trim().toUpperCase();
+    const targetId = String(req.body.targetId || target.id || recommendationId || '').trim();
+    if (!officerId || !targetType || !targetId) {
+      return res.status(400).json({ success: false, error: 'officerId and a recommendationId or inspection targetType/targetId are required' });
+    }
+
+    const officer = store.officers.find(item => item.officerId === officerId);
+    if (!officer) return res.status(404).json({ success: false, error: 'Officer not found' });
+    if (recommendationId && !store.raidRecommendations.some(item => item.recommendationId === recommendationId)) {
+      return res.status(404).json({ success: false, error: 'Raid recommendation not found' });
+    }
+
+    const existing = (store.assignments || []).find(item => (
+      (recommendationId && item.recommendationId === recommendationId && ACTIVE_ASSIGNMENT_STATUSES.has(item.status)) ||
+      (!recommendationId && item.targetType === targetType && item.targetId === targetId && ACTIVE_ASSIGNMENT_STATUSES.has(item.status))
+    ));
+    const oldOfficerId = existing?.officerId;
+    if (officer.status === 'OFF_DUTY' || officer.availability === 'OFFLINE') {
+      return res.status(409).json({ success: false, error: `${officer.name} is offline and cannot receive an assignment` });
+    }
+    if (!existing && officer.workload >= officer.workloadCapacity) {
+      return res.status(409).json({ success: false, error: `${officer.name} is at workload capacity` });
+    }
+
+    const now = new Date().toISOString();
+    const assignment = existing || {
+      assignmentId: createId('ASGN'),
+      assignedAt: now,
+      status: 'ASSIGNED'
+    };
+    Object.assign(assignment, {
+      officerId,
+      officerName: officer.name,
+      officerRole: officer.role,
+      officerTitle: officer.title,
+      jurisdiction: officer.jurisdiction,
+      district: req.body.district || target.district || null,
+      recommendationId,
+      targetType,
+      targetId,
+      note: String(req.body.note || '').trim() || null,
+      assignedBy: req.body.assignedBy || req.user.username || req.user.nodeId || 'GOVT_AUDITOR',
+      updatedAt: now
+    });
+    if (!existing) store.assignments.unshift(assignment);
+    refreshOfficerWorkload(oldOfficerId);
+    refreshOfficerWorkload(officerId);
+
+    if (recommendationId) {
+      const recommendation = store.raidRecommendations.find(item => item.recommendationId === recommendationId);
+      Object.assign(recommendation, {
+        assignmentId: assignment.assignmentId,
+        assignedOfficerId: officerId,
+        assignmentStatus: assignment.status,
+        assignedAt: now
+      });
+      emitRisk(io, 'raid_recommendation_updated', recommendation);
+    }
+    emitAssignment(io, existing ? 'assignment_updated' : 'assignment_created', assignment);
+    res.status(existing ? 200 : 201).json({ success: true, assignment, reassigned: Boolean(existing) });
+  });
+
+  router.patch('/admin/assignments/:assignmentId', (req, res) => {
+    const assignment = (store.assignments || []).find(item => item.assignmentId === req.params.assignmentId);
+    if (!assignment) return res.status(404).json({ success: false, error: 'Assignment not found' });
+    const previousOfficerId = assignment.officerId;
+    const nextOfficerId = req.body.officerId ? String(req.body.officerId).trim() : assignment.officerId;
+    const nextOfficer = store.officers.find(item => item.officerId === nextOfficerId);
+    if (!nextOfficer) return res.status(404).json({ success: false, error: 'Officer not found' });
+    if (nextOfficerId !== previousOfficerId && (nextOfficer.status === 'OFF_DUTY' || nextOfficer.availability === 'OFFLINE')) {
+      return res.status(409).json({ success: false, error: `${nextOfficer.name} is offline and cannot receive an assignment` });
+    }
+    if (nextOfficerId !== previousOfficerId && nextOfficer.workload >= nextOfficer.workloadCapacity) {
+      return res.status(409).json({ success: false, error: `${nextOfficer.name} is at workload capacity` });
+    }
+    const status = req.body.status ? String(req.body.status).toUpperCase() : assignment.status;
+    if (!ASSIGNMENT_STATUSES.has(status)) {
+      return res.status(400).json({ success: false, error: `status must be one of ${[...ASSIGNMENT_STATUSES].join(', ')}` });
+    }
+    Object.assign(assignment, {
+      officerId: nextOfficerId,
+      officerName: nextOfficer.name,
+      officerRole: nextOfficer.role,
+      officerTitle: nextOfficer.title,
+      status,
+      note: req.body.note === undefined ? assignment.note : String(req.body.note || '').trim() || null,
+      updatedAt: new Date().toISOString()
+    });
+    refreshOfficerWorkload(previousOfficerId);
+    refreshOfficerWorkload(nextOfficerId);
+    if (assignment.recommendationId) {
+      const recommendation = store.raidRecommendations.find(item => item.recommendationId === assignment.recommendationId);
+      if (recommendation) {
+        recommendation.assignedOfficerId = nextOfficerId;
+        recommendation.assignmentStatus = status;
+        recommendation.updatedAt = assignment.updatedAt;
+        emitRisk(io, 'raid_recommendation_updated', recommendation);
+      }
+    }
+    emitAssignment(io, 'assignment_updated', assignment);
+    res.json({ success: true, assignment });
   });
 
   router.patch('/admin/risk/raid-recommendations/:recommendationId/approval', (req, res) => {
